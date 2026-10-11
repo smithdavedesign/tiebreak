@@ -1,0 +1,24 @@
+{
+  "title": "tiebreak — swipe-to-decide polls for indecisive people and sellers",
+  "repoName": "tiebreak",
+  "oneLiner": "People post two options, strangers swipe to pick one, and the poll closes at a vote target or deadline; sellers and creators pay a few dollars for a fast verdict instead of PickFu's $15+.",
+  "overlaps": "none",
+  "tags": [
+    "consumer",
+    "social"
+  ],
+  "effort": "Medium",
+  "confidence": "Low",
+  "sources": [
+    "https://alternativeto.net/software/agree/about",
+    "https://www.pickfu.com/help/what-is-pickfu",
+    "https://inspiretothrive.com/tubebuddy/",
+    "https://digiday.com/brands/brands-stump-teen-votes-wishbone",
+    "https://community.etsy.com/t5/Etsy-Success/Which-picture-do-you-think-is-best/m-p/57028318",
+    "https://community.etsy.com/t5/Etsy-Success/Quicky-question-photo-comparison/m-p/49663478/highlight/true",
+    "https://www.capterra.com.sg/software/175737/instant-market-research"
+  ],
+  "seedId": "seed-214dc5",
+  "slug": "tiebreak",
+  "recordedAt": "2026-10-11T20:02:49.232Z"
+}

@@ -1,0 +1,55 @@
+{
+  "verdict": "pass",
+  "score": 4,
+  "summary": "A swipe-poll app has a two-sided cold start, and the paying segment (sellers/creators) is unproven against PickFu's vetted panels. The evidence is two forum threads, with no one named and no sign anyone would pay.",
+  "forcingQuestions": {
+    "demand": {
+      "score": 3,
+      "evidence": "Two Etsy forum threads show sellers asking strangers to rank photos, but nobody has paid or asked for a tool. Consumer apps (Agree $3 one-time, Wishbone sponsor-funded) show weak willingness to pay."
+    },
+    "statusQuo": {
+      "score": 5,
+      "evidence": "Forums, Reddit, friends and PickFu ($15+, or $50 per conflicting listings) are the workaround. Slow and untallied but free, and the pain is occasional."
+    },
+    "specificity": {
+      "score": 3,
+      "evidence": "The buyer is a category (solo Etsy/Amazon seller, author, YouTuber), not a named person, and there is no stated consequence beyond a better photo."
+    },
+    "wedge": {
+      "score": 4,
+      "evidence": "One A/B link with a close rule is a weekend build, but with no voters of its own it is a copyable poll tool. Audience-only links remove the cold start but are thin."
+    },
+    "futureFit": {
+      "score": 3,
+      "evidence": "Platform-native tests (YouTube thumbnail testing, Amazon experiments) and AI testers move the verdict into the platforms, which makes a stranger-poll tool less necessary."
+    }
+  },
+  "premises": [
+    "Sellers will pay $5-$9 per poll for stranger votes (unsupported; PickFu sells vetted panels and reasons)",
+    "A free consumer loop will seed voters (unsupported; crowded, sponsor-funded category)",
+    "'Vote 5, post 1' bootstraps the feed (plausible, untested)",
+    "Sellers trust anonymous votes enough to act (open question in the PRD)",
+    "The pain is real (weakly supported by two forum threads)"
+  ],
+  "alternatives": [
+    "Minimal: audience-only poll links with no public feed",
+    "Extend David's existing ThisOrThat repo with deadline, vote target and share link",
+    "Full swipe marketplace with feed, credits and Stripe (the PRD; high risk)",
+    "Concierge test: hand-tally a $5 seller poll from forum votes before writing code"
+  ],
+  "wedge": "One shareable A/B poll with a vote target or deadline and a result page, used by sellers on their own audience",
+  "feasibility": {
+    "m1Weekend": true,
+    "zeroCost": true,
+    "notes": "Next.js on Vercel Hobby with Supabase or Neon free Postgres and framer-motion. The one test that proves M1: three distinct voters close the poll with the majority winner, and a repeat voter gets 409. The real unknown is willingness to pay, not the build."
+  },
+  "risks": [
+    "Two-sided cold start: polls never close without voters",
+    "Stranger votes are low quality and carry no reasons",
+    "Image moderation of stranger uploads",
+    "Platform-native testing replaces the use case",
+    "Overlaps ThisOrThat, a low-health repo, adding maintenance",
+    "Competes with funded incumbent PickFu"
+  ],
+  "killCriteria": "Drop if, after a two-week test, signup rate is under 5% of 50+ seller visitors, no seller offers or pre-pays $5, sellers mainly ask for demographics or written reasons, or public polls rarely hit their vote target within 24 hours."
+}

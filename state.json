@@ -1,0 +1,17 @@
+{
+  "stage": "build",
+  "review": {
+    "verdict": "pass",
+    "score": 4,
+    "summary": "A swipe-poll app has a two-sided cold start, and the paying segment (sellers/creators) is unproven against PickFu's vetted panels. The evidence is two forum threads, with no one named and no sign anyone would pay.",
+    "at": "2026-10-11T20:03:35.937Z",
+    "notionAt": "2026-10-11T20:03:37.382Z"
+  },
+  "updatedAt": "2026-10-11T20:19:11.963Z",
+  "ownerDecision": {
+    "decision": "build",
+    "at": "2026-10-11T20:19:11.963Z",
+    "source": "repohq"
+  },
+  "ownerApproved": true
+}

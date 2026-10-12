@@ -6,7 +6,11 @@ import { VOTES_PER_CREDIT } from '@/lib/limits'
 import { listFeed } from '@/lib/polls'
 import { FeedView } from './feed-view'
 
-export const metadata: Metadata = { title: 'Public feed · tiebreak' }
+export const metadata: Metadata = {
+  title: 'Public feed',
+  description: 'Swipe through open polls and help strangers decide. Every 5 votes earns you a public poll of your own.',
+  alternates: { canonical: '/feed' },
+}
 
 /** The public feed: swipe through strangers' polls and earn posting credits. */
 export default async function FeedPage() {

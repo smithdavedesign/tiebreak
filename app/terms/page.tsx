@@ -1,7 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = { title: 'Terms, refunds and privacy · tiebreak' }
+export const metadata: Metadata = {
+  title: 'Terms and refunds',
+  description: 'Plain-language terms for tiebreak: the service, Pro (a one-time payment), refunds within 14 days, and acceptable use.',
+  alternates: { canonical: '/terms' },
+}
 
 /** The terms a buyer agrees to, the refund policy and what's stored. Plain language. */
 export default function TermsPage() {
@@ -9,7 +13,7 @@ export default function TermsPage() {
 
   return (
     <article className="terms">
-      <h1>Terms, refunds and privacy</h1>
+      <h1>Terms and refunds</h1>
       <p className="hint">Plain-language terms for tiebreak while it is in beta.</p>
 
       <h2>The service</h2>
@@ -41,11 +45,13 @@ export default function TermsPage() {
 
       <h2>Privacy</h2>
       <p>
-        Your browser gets a random id in a cookie, and that id is your account. We store the polls you create and your
-        votes and reports, tied to that id and never to your name. Creators can download the votes on their own polls
-        (time and option, never who voted). If you buy Pro, Stripe handles your card and we never see it. Stripe tells
-        us your email, the amount and the currency, which we keep to answer refund requests. There are no ads,
-        analytics or trackers. Option images load straight from the links poll creators give.
+        What&apos;s stored and who sees it is on the <Link href="/privacy">privacy page</Link>.
+      </p>
+
+      <h2>No warranty</h2>
+      <p>
+        tiebreak is provided as is, without warranty of any kind. A poll&apos;s result is a quick signal from whoever
+        voted, not advice.
       </p>
 
       <h2>Contact</h2>

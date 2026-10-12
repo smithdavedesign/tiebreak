@@ -6,7 +6,11 @@ import { confirmCheckout, getPlan } from '@/lib/plans'
 import { getProPrice } from '@/lib/stripe'
 import { UpgradeButton } from './upgrade-button'
 
-export const metadata: Metadata = { title: 'Pro · tiebreak' }
+export const metadata: Metadata = {
+  title: 'Pro',
+  description: 'tiebreak Pro: private polls where only you see the result, and CSV export of your votes. One-time payment.',
+  alternates: { canonical: '/pro' },
+}
 
 /** What Pro adds and the upgrade button; also Stripe Checkout's return page (?session_id=…). */
 export default async function ProPage({

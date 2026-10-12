@@ -43,3 +43,14 @@ describe('api client', () => {
     await expect(api.vote('abcdefghijkl', 0)).rejects.toBeInstanceOf(ApiError)
   })
 })
+
+describe('checkout', () => {
+  it("asks the API for this device's checkout link", async () => {
+    const fetchMock = jest.fn(async () => json({ url: 'https://buy.stripe.com/test_x?client_reference_id=00000000-0000-4000-8000-000000000003' }))
+    const api = createApi('https://example.test', memoryStore('00000000-0000-4000-8000-000000000003'), fetchMock)
+    expect(await api.checkout()).toContain('client_reference_id=00000000-0000-4000-8000-000000000003')
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://example.test/checkout')
+    expect(new Headers(init.headers).get(VOTER_HEADER)).toBe('00000000-0000-4000-8000-000000000003')
+  })
+})

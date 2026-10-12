@@ -36,7 +36,9 @@ export async function fulfilCheckout(session: unknown, now = new Date()): Promis
   if (!isRecord(session)) return false
   const { id, client_reference_id: accountId, payment_status: status, metadata } = session
   if (typeof id !== 'string' || id.length === 0 || id.length > MAX_SESSION_ID_LENGTH) return false
-  if (!isRecord(metadata) || metadata.app !== CHECKOUT_APP) return false
+  // Sessions from our Checkout carry metadata.app; from the Payment Link, its metadata.repo (copied by
+  // Stripe). Every app on the Stripe account gets every event, so anything else isn't ours.
+  if (!isRecord(metadata) || (metadata.app !== CHECKOUT_APP && metadata.repo !== CHECKOUT_APP)) return false
   if (typeof accountId !== 'string' || !isVoterId(accountId)) return false
   if (typeof status !== 'string' || !SETTLED.has(status)) return false
 

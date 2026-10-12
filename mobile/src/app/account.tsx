@@ -43,6 +43,14 @@ export default function AccountScreen() {
       <Text style={styles.small}>
         Your account lives on this device with no sign-up. Deleting the app starts a new one.
       </Text>
+      <View style={styles.links}>
+        <Pressable onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/privacy`)} accessibilityRole="link">
+          <Text style={styles.link}>Privacy</Text>
+        </Pressable>
+        <Pressable onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/terms`)} accessibilityRole="link">
+          <Text style={styles.link}>Terms & refunds</Text>
+        </Pressable>
+      </View>
     </View>
   )
 }
@@ -57,4 +65,6 @@ const styles = StyleSheet.create({
   error: { color: colors.danger },
   primary: { backgroundColor: colors.text, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   primaryText: { color: '#fff', fontWeight: '700', fontSize: 17 },
+  links: { flexDirection: 'row', justifyContent: 'center', gap: 24 },
+  link: { color: colors.b, fontWeight: '600' },
 })

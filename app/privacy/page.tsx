@@ -1,0 +1,63 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Privacy',
+  description: 'What tiebreak stores (an anonymous id, your polls and votes), what it never collects, and who else sees anything.',
+  alternates: { canonical: '/privacy' },
+}
+
+/** What's stored and why, in plain language. Keep it true when the product changes. */
+export default function PrivacyPage() {
+  const contact = process.env.CONTACT_EMAIL
+  return (
+    <article className="terms">
+      <h1>Privacy</h1>
+      <p className="hint">Short version: no sign-up, no ads, no tracking cookies. We store polls and votes against a random id.</p>
+
+      <h2>Your account is a random id</h2>
+      <p>
+        There are no logins. The website gives your browser one cookie holding a random id. The iPhone and Android app keeps
+        the same kind of id in the phone&apos;s secure storage. That id is your account. It owns your polls, votes, reports,
+        posting credits and Pro, and it&apos;s never tied to your name. Clearing cookies or deleting the app starts a new one.
+      </p>
+
+      <h2>What we store</h2>
+      <ul>
+        <li>Polls you create: the question, the options (text and image links) and when they close.</li>
+        <li>Your votes and reports, with the time. Creators can download the votes on their own polls (time and option, never who voted).</li>
+        <li>
+          If you buy Pro: Stripe handles your card and we never see it. Stripe tells us your email, the amount and the
+          currency, which we keep to answer refund requests.
+        </li>
+      </ul>
+
+      <h2>Visit counting</h2>
+      <p>
+        The home page sends one anonymous &ldquo;page view&rdquo; to our own counter (RepoHQ), with the page that linked
+        you here, if your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your
+        IP address with the view, never the address itself, so it can limit spam to a few counts an hour. There are no third-party analytics, ad trackers or pixels.
+      </p>
+
+      <h2>Who else sees anything</h2>
+      <p>
+        Stripe, if you pay. Our hosts, Vercel (the website) and Neon (the database), run the service. Option images load
+        straight from the links poll creators give, so those sites see the request. Nothing is sold or shared for ads.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        {contact ? (
+          <>
+            Email <a href={`mailto:${contact}`}>{contact}</a>
+          </>
+        ) : (
+          <>
+            Open an issue on <a href="https://github.com/smithdavedesign/tiebreak/issues">GitHub</a>
+          </>
+        )}{' '}
+        to ask what&apos;s stored for your id or to have it deleted. See also the <Link href="/terms">terms and refunds</Link>.
+      </p>
+    </article>
+  )
+}

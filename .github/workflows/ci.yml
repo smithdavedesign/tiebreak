@@ -1,0 +1,35 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - name: next build (placeholder DB URL; no queries at build time)
+        run: npx next build
+        env:
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          NEXT_TELEMETRY_DISABLED: '1'
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: mobile/package-lock.json }
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx jest --ci
+      - name: Build the iOS and Android bundles
+        run: npx expo export --platform ios --platform android --output-dir dist
+        env:
+          CI: '1'

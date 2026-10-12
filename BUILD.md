@@ -472,6 +472,19 @@ Superseded by "## Review" below. Note one change: M1 expected "M2 accounts" to f
 
 </details>
 
+## M4: native app (built 2026-10-12)
+
+David's build note asked for a native app for Android and iPhone. The PRD written before that listed "native apps" as a non-goal, and a manual re-run of the MVP build passed a different note. So M1–M3 came out web-only. M4 adds the native side without replacing anything:
+- **`mobile/`**: an Expo SDK 57 app (React Native 0.86, Expo Router, gesture-handler with Reanimated 4 for the swipe, SecureStore for the id). Screens and setup are in `mobile/README.md`.
+- **API**: one addition. `voterOf(request)` in `lib/http.ts` reads the `x-tiebreak-voter` header before the cookie, and `remember()` returns a newly minted id in that header. Browsers can't set a custom header cross-site without a CORS preflight, which this API never grants, so the header isn't a forgery route. Four routes switched from reading the cookie to `voterOf`.
+- **Kept apart**: `mobile/` is excluded from the root `tsconfig.json` and from Vercel (`.vercelignore`), so the web build doesn't compile React Native.
+
+Checked:
+- root: `npx vitest run` passes (215 tests, 4 of them new identity tests), `tsc` is clean and `next build` succeeds;
+- `mobile/`: `npm test` passes (9), `tsc` is clean, `npx expo export` builds the iOS and Android bundles, and `expo-doctor` passes 21/21.
+
+Not checked: it hasn't run on a real device or simulator, since this Mac has neither. Run it with Expo Go (`mobile/README.md`).
+
 ## What the product does now (M1 + M2 + M3)
 
 - **Accounts are anonymous.** The first vote, poll, report or checkout a browser makes sets the httpOnly `tb_voter` cookie. That cookie is the account: it holds your votes, your polls, your reports, your posting credits and, since M3, your Pro plan. There's no sign-up.

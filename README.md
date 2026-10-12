@@ -5,6 +5,7 @@ People post two options, strangers swipe to pick one, and the poll closes at a v
 - [Research](RESEARCH.md) — findings and sources
 - [PRD](PRD.md)
 - [Roadmap](ROADMAP.md)
+- [Native app](mobile/README.md): iPhone and Android (Expo), on the same API. Run it on your phone with Expo Go.
 
 Effort: Medium · Confidence: Low
 

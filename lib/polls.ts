@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto'
 import { accountOf, lockAccount, type AccountView } from './credits'
 import { toCsv } from './csv'
 import { getDb, type Sql } from './db'
+import { HOUSE_ID, houseEnabled, stockHouse } from './house'
 import {
   FEED_PAGE_SIZE,
   MAX_HOURS,
@@ -358,9 +359,12 @@ export async function castVote(
  * deadline, with fewer than REPORTS_TO_HIDE reports, minus the viewer's own
  * polls and the ones they already voted on or reported. Soonest deadline first.
  * Polls past their deadline are only filtered out here; reads and votes close them.
+ * People's polls come before house polls (lib/house.ts), and a house question is
+ * hidden from anyone who voted on an earlier copy of it.
  */
 export async function listFeed(viewerId: string | null, now = new Date()): Promise<PollView[]> {
   const db = await getDb()
+  if (houseEnabled()) await stockHouse(db, now)
   const { rows } = await db.query<PollRow & { vote_count: number }>(
     `SELECT p.*, (SELECT count(*)::int FROM votes v WHERE v.poll_id = p.id) AS vote_count
        FROM polls p
@@ -371,10 +375,13 @@ export async function listFeed(viewerId: string | null, now = new Date()): Promi
         AND ($1::text IS NULL OR (
               p.creator_id IS DISTINCT FROM $1::text
           AND NOT EXISTS (SELECT 1 FROM votes v WHERE v.poll_id = p.id AND v.voter_id = $1::text)
-          AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.poll_id = p.id AND r.reporter_id = $1::text)))
-      ORDER BY p.closes_at, p.id
+          AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.poll_id = p.id AND r.reporter_id = $1::text)
+          AND (p.creator_id IS DISTINCT FROM $5::text OR NOT EXISTS (
+                SELECT 1 FROM votes v JOIN polls q ON q.id = v.poll_id
+                 WHERE v.voter_id = $1::text AND q.creator_id = $5::text AND q.question = p.question))))
+      ORDER BY p.creator_id IS NOT DISTINCT FROM $5::text, p.closes_at, p.id
       LIMIT $4`,
-    [viewerId, now.toISOString(), REPORTS_TO_HIDE, FEED_PAGE_SIZE],
+    [viewerId, now.toISOString(), REPORTS_TO_HIDE, FEED_PAGE_SIZE, HOUSE_ID],
   )
   return rows.map((row) => viewOf(row, viewerId, { voteCount: row.vote_count, tally: null }, null))
 }

@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "tiebreak",
+    "slug": "tiebreak",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smithdavedesign.tiebreak"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.smithdavedesign.tiebreak"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "scheme": "tiebreak",
+    "extra": {
+      "apiUrl": "https://tiebreak-phi.vercel.app"
+    }
+  }
+}

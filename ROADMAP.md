@@ -21,6 +21,16 @@ Exit criteria:
 - A free account cannot create a private poll (403); a paid account can.
 - Export of a closed poll returns a CSV whose row count equals the vote count.
 
+## M4 — Native app for iPhone and Android
+Added 2026-10-12 on David's request ("it needed to be a native app that could be used on Android or iOS iPhone"). M1–M3 stay as the backend and the web version.
+Deliverables: an Expo (React Native) app in `mobile/` with the feed (swipe cards), the poll screen (vote, result, share, report), poll creation and the account screen, all talking to the existing API. Anonymous identity through an `x-tiebreak-voter` header kept in secure storage.
+Exit criteria:
+- The API identifies the same account by `x-tiebreak-voter` as by the `tb_voter` cookie. A vote by header shows as `myVote` to the cookie and vice versa, a second vote by header is a 409, and a new account's id comes back in the header (`tests/native-identity.test.ts`).
+- The app's API client stores the minted id and sends it on every later request (`mobile/__tests__/api-test.ts`).
+- Swiping follows the web rule: left past 80 px is A, right is B. Polls with 3 or 4 options vote by button.
+- The create form rejects what the server's `parseNewPoll` rejects.
+- `npx expo export` builds both the iOS and Android bundles, and `npx expo-doctor` passes.
+
 ## Suggested stack
 - Next.js PWA: one codebase for swipe UI and API, easy free hosting.
 - Supabase Postgres: free tier, built-in auth, row-level security.

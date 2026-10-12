@@ -1,0 +1,2 @@
+# The native app (Expo) has its own package and build; Vercel serves only the web app and API.
+mobile/

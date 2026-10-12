@@ -7,6 +7,13 @@ import { randomUUID } from 'node:crypto'
  * so M1 browsers keep their votes.
  */
 export const VOTER_COOKIE = 'tb_voter'
+/**
+ * The same anonymous id for the native app (mobile/), which keeps it in secure
+ * storage instead of a cookie jar. A new id is sent back in this header too.
+ * Browsers can't add a custom header to a cross-site request without a CORS
+ * preflight, which this API never answers, so it can't be forged cross-site.
+ */
+export const VOTER_HEADER = 'x-tiebreak-voter'
 const VOTER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60
 
@@ -43,9 +50,16 @@ export interface Account {
   isNew: boolean
 }
 
-/** The caller's account: the id from their cookie, or a fresh one. */
+/** The caller's anonymous id: the native app's header first, else the browser cookie. */
+export function voterOf(request: Request): string | null {
+  const header = request.headers.get(VOTER_HEADER)
+  if (header !== null) return isVoterId(header.trim()) ? header.trim() : null
+  return readVoter(request.headers.get('cookie'))
+}
+
+/** The caller's account: the id from their header or cookie, or a fresh one. */
 export function identify(request: Request): Account {
-  const existing = readVoter(request.headers.get('cookie'))
+  const existing = voterOf(request)
   return existing ? { id: existing, isNew: false } : { id: randomUUID(), isNew: true }
 }
 
@@ -54,6 +68,7 @@ export function remember(response: Response, account: Account, request: Request)
   if (account.isNew) {
     const secure = new URL(request.url).protocol === 'https:'
     response.headers.append('set-cookie', voterCookie(account.id, secure))
+    response.headers.set(VOTER_HEADER, account.id)
   }
   return response
 }

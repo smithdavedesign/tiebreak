@@ -20,7 +20,8 @@ PickFu is a paid panel with written reasons, at $15 or more a poll. Agree is pri
 - Paid tier: private polls, higher vote targets and CSV export.
 
 ## Non-goals
-- Native apps, demographic-vetted panels, written voter reasons, dating, political polling.
+- Demographic-vetted panels, written voter reasons, dating, political polling.
+- ~~Native apps~~: now in scope. David asked for a native app for iPhone and Android (2026-10-11). It's ROADMAP M4: an Expo app in `mobile/` on the same API.
 
 ## Success metrics
 - 50% of public polls reach their vote target within 24 hours in the test cohort.

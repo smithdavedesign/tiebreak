@@ -1,4 +1,4 @@
-import { jsonError, readVoter } from '@/lib/http'
+import { jsonError, voterOf } from '@/lib/http'
 import { exportVotes, type ExportResult } from '@/lib/polls'
 
 const FAILURES: Record<Exclude<ExportResult['kind'], 'ok'>, [number, string]> = {
@@ -11,7 +11,7 @@ const FAILURES: Record<Exclude<ExportResult['kind'], 'ok'>, [number, string]> = 
 /** GET /polls/:id/export → 200 text/csv (one row per vote) | 403 | 404 | 409 */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const result = await exportVotes(id, readVoter(request.headers.get('cookie')))
+  const result = await exportVotes(id, voterOf(request))
   if (result.kind !== 'ok') return jsonError(...FAILURES[result.kind])
   return new Response(result.csv, {
     headers: {

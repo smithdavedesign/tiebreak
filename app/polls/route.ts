@@ -1,9 +1,9 @@
-import { identify, jsonError, readJson, readVoter, remember } from '@/lib/http'
+import { identify, jsonError, readJson, remember, voterOf } from '@/lib/http'
 import { createPoll, listFeed, parseNewPoll } from '@/lib/polls'
 
 /** GET /polls → 200 { polls } — the public feed as the caller sees it. */
 export async function GET(request: Request) {
-  const polls = await listFeed(readVoter(request.headers.get('cookie')))
+  const polls = await listFeed(voterOf(request))
   return Response.json({ polls }, { headers: { 'cache-control': 'no-store' } })
 }
 

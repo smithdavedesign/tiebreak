@@ -21,6 +21,8 @@ npx expo start          # prints a QR code
 
 Install **Expo Go** from the App Store or Google Play, then scan the QR code. On iPhone you scan it with the Camera app. The app talks to the live API (`expo.extra.apiUrl` in `app.json`, `https://tiebreak-phi.vercel.app`). To point it at a local `npm run dev`, change that to your computer's LAN address.
 
+**No phone, no Xcode or Android Studio:** `npm run web` opens the app in your browser at http://localhost:8081. Use Chrome's device toolbar (⌘⇧M in DevTools) to get a phone-sized screen. It's the same code, rendered with react-native-web against the live API. In development, requests go through the dev server's `/live-api` proxy (`metro.config.js`), because the API doesn't allow other origins, and the anonymous id is kept in `localStorage` (`src/lib/client.web.ts`). It's good for flows and layout. Swipe gestures, secure storage and the in-app browser only behave exactly as on a phone in Expo Go or a simulator.
+
 ## Checks
 
 ```sh

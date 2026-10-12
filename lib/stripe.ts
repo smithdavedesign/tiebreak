@@ -1,5 +1,11 @@
 // Stripe over its REST API (no SDK): Checkout Sessions, the Pro price and
-// webhook signatures. The only module that knows Stripe's URLs and the
+// webhook signatures.
+//
+// Two ways to sell Pro. Preferred: a Stripe Payment Link (STRIPE_PAYMENT_LINK, set by
+// ~/ai-stack/bin/provision stripe), which needs no Stripe API key in this app at all: buyers
+// go to the link with their account id as client_reference_id, and the signed webhook
+// (STRIPE_WEBHOOK_SECRET) grants Pro. Fallback: Checkout Sessions created here with
+// STRIPE_SECRET_KEY and STRIPE_PRICE_ID. The only module that knows Stripe's URLs and the
 // STRIPE_* environment variables; nothing here touches the database, and the
 // secrets never leave the server.
 import { createHmac, timingSafeEqual } from 'node:crypto'
@@ -50,12 +56,32 @@ async function call(secretKey: string, path: string, form?: URLSearchParams): Pr
 
 export type CheckoutStart = { kind: 'ok'; url: string } | { kind: 'unconfigured' | 'failed' }
 
+/** The Payment Link for Pro (https://buy.stripe.com/…), or null when payments use Checkout Sessions. */
+export function paymentLink(): string | null {
+  const link = process.env.STRIPE_PAYMENT_LINK
+  if (!link) return null
+  try {
+    return new URL(link).protocol === 'https:' ? link : null
+  } catch {
+    return null
+  }
+}
+
+/** The link for this account: Stripe copies client_reference_id onto the Checkout Session it creates. */
+export function paymentLinkFor(link: string, accountId: string): string {
+  const url = new URL(link)
+  url.searchParams.set('client_reference_id', accountId)
+  return url.toString()
+}
+
 /**
  * Starts a hosted Checkout for one Pro upgrade, paid by `accountId`. Stripe
  * sends the buyer back to /pro?session_id=…, which fulfils right away; the
  * webhook fulfils too, in case they never come back.
  */
 export async function createCheckoutSession(accountId: string, origin: string): Promise<CheckoutStart> {
+  const link = paymentLink()
+  if (link) return { kind: 'ok', url: paymentLinkFor(link, accountId) }
   const config = settings()
   if (!config) return { kind: 'unconfigured' }
   const session = await call(
@@ -91,6 +117,9 @@ export function formatPrice(unitAmount: number, currency: string): string {
 
 /** The Pro price as a label, read from Stripe so the page and Checkout agree; null if unknown. */
 export async function getProPrice(): Promise<string | null> {
+  // With a Payment Link there's no API key to look the price up: provision sets this label.
+  const label = process.env.STRIPE_PRICE_LABEL?.trim()
+  if (label) return label
   const config = settings()
   if (!config) return null
   const price = await call(config.secretKey, `/prices/${encodeURIComponent(config.priceId)}`)

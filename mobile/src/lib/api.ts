@@ -97,6 +97,8 @@ export function createApi(base: string, store: VoterStore, fetchImpl: Fetch = fe
     create: (poll: NewPoll) => request<{ id: string; shareUrl: string; poll: Poll }>('POST', '/polls', poll),
     report: (id: string) => request<{ reported: true }>('POST', `/polls/${encodeURIComponent(id)}/reports`, {}),
     account: () => request<{ account: Account; plan: 'free' | 'pro' }>('GET', '/account'),
+    /** The checkout page for this device's account (Pro lands on the app's account, not the browser's). */
+    checkout: () => request<{ url: string }>('POST', '/checkout', {}).then((d) => d.url),
   }
 }
 

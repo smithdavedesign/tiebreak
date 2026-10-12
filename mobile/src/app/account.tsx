@@ -13,11 +13,21 @@ export default function AccountScreen() {
   const [me, setMe] = useState<{ account: Account; plan: 'free' | 'pro' } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useFocusEffect(
-    useCallback(() => {
-      api.account().then(setMe, (e) => setError(e instanceof Error ? e.message : 'Could not load your account'))
-    }, []),
-  )
+  const load = useCallback(() => {
+    api.account().then(setMe, (e) => setError(e instanceof Error ? e.message : 'Could not load your account'))
+  }, [])
+  useFocusEffect(load)
+
+  // Checkout opens in the browser with this device's account attached (the web has its own cookie
+  // account, so opening /pro there would put Pro on the wrong one). Back in the app, reload the plan.
+  const getPro = async () => {
+    try {
+      await WebBrowser.openBrowserAsync(await api.checkout())
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start checkout')
+    }
+  }
 
   return (
     <View style={styles.page}>
@@ -36,8 +46,8 @@ export default function AccountScreen() {
         </View>
       ) : null}
       {me && me.plan !== 'pro' ? (
-        <Pressable style={styles.primary} onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/pro`)} accessibilityRole="button">
-          <Text style={styles.primaryText}>Get Pro on the website</Text>
+        <Pressable style={styles.primary} onPress={getPro} accessibilityRole="button">
+          <Text style={styles.primaryText}>Get Pro</Text>
         </Pressable>
       ) : null}
       <Text style={styles.small}>

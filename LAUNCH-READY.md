@@ -21,7 +21,7 @@ node -e 'require("/Users/davidsmith/idea-factory/lib/golive").auditLaunch("https
 ```
 
 ## Left for David
-- **Stripe:** live Pro needs `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID` and `STRIPE_WEBHOOK_SECRET` in the Vercel env (see BUILD.md › Infrastructure). Do it in test mode first.
+- **Stripe:** Pro now also works from a payment link, which `~/ai-stack/bin/provision stripe tiebreak <price> --success-path "/pro?session_id={CHECKOUT_SESSION_ID}" --webhook /stripe/webhook` sets up: it puts `STRIPE_PAYMENT_LINK`, `STRIPE_PRICE_LABEL` and `STRIPE_WEBHOOK_SECRET` in the Vercel env, and no Stripe API key reaches the app. The only manual step is the broker's restricted key (ai-stack README › One-time setup, step 6). The older `STRIPE_SECRET_KEY` + `STRIPE_PRICE_ID` checkout still works if those are set and no link is.
 - **Price:** decide it (the pipeline's checklist step "Price decided").
 - **Custom domain** (optional): add it in Vercel, then set `NEXT_PUBLIC_SITE_URL`.
 - **App stores:** Apple Developer ($99/year) and Google Play ($25 once). See `mobile/README.md`.

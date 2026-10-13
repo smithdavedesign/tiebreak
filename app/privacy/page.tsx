@@ -34,9 +34,14 @@ export default function PrivacyPage() {
 
       <h2>Visit counting</h2>
       <p>
-        The home page sends one anonymous &ldquo;page view&rdquo; to our own counter (RepoHQ), with the page that linked
-        you here, if your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your
-        IP address with the view, never the address itself, so it can limit spam to a few counts an hour. There are no third-party analytics, ad trackers or pixels.
+        Our own counter (RepoHQ) gets three anonymous events: a &ldquo;visit&rdquo; (the first page you open in a browser
+        session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
+        (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
+        your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
+        with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
+        automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting
+        you twice, your browser keeps two small flags in its own storage; they never leave your device. There are no
+        third-party analytics, ad trackers or pixels.
       </p>
 
       <h2>Who else sees anything</h2>

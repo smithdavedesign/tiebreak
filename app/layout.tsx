@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
+import { VisitBeacon } from './visit-beacon'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </nav>
         </header>
         <main>{children}</main>
+        <VisitBeacon />
         <footer className="site-footer">
           <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms &amp; refunds</Link>
         </footer>

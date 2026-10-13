@@ -4,7 +4,6 @@ import { getAccount } from '@/lib/credits'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
 import { getPlan } from '@/lib/plans'
 import { CreatePollForm } from './create-poll-form'
-import { VisitBeacon } from './visit-beacon'
 
 export default async function HomePage() {
   const voter = (await cookies()).get(VOTER_COOKIE)?.value
@@ -23,7 +22,6 @@ export default async function HomePage() {
         posting there.
       </p>
       <CreatePollForm account={account} plan={plan} />
-      <VisitBeacon />
     </>
   )
 }

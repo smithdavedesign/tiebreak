@@ -277,6 +277,12 @@ button.link {
   background: var(--win);
 }
 
+/* The count stays on one line ("2 (67%)"); the option text takes the wrapping. */
+.bar-label span:last-child {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .win .bar-label {
   font-weight: 700;
 }

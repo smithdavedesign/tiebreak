@@ -1,11 +1,11 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ISSUES_URL, PRICE, pageMetadata } from '@/lib/site'
 
-export const metadata: Metadata = {
-  title: 'Terms and refunds',
-  description: 'Plain-language terms for tiebreak: the service, Pro (a one-time payment), refunds within 14 days, and acceptable use.',
-  alternates: { canonical: '/terms' },
-}
+export const metadata = pageMetadata(
+  '/terms',
+  'Terms and refunds',
+  `Plain-language terms for tiebreak: the service, Pro (${PRICE.label}, paid once), refunds, no warranty, and acceptable use.`,
+)
 
 /** The terms a buyer agrees to, the refund policy and what's stored. Plain language. */
 export default function TermsPage() {
@@ -25,16 +25,18 @@ export default function TermsPage() {
 
       <h2>Pro</h2>
       <p>
-        Pro is a one-time payment through Stripe, with no subscription. It adds private polls, where only you see the
-        result, and CSV export of the votes on your polls. There are no logins: Pro belongs to the browser you paid in,
-        like your polls and credits, so clearing cookies or switching devices loses it. The price is shown on the{' '}
-        <Link href="/pro">Pro page</Link> and at checkout.
+        <Link href="/pro">Pro</Link> costs {PRICE.label}, paid once through Stripe, with no subscription. It adds private
+        polls, where only you see the result, and CSV export of the votes on your polls. There are no logins: Pro
+        belongs to the browser you paid in, like your polls and credits, so clearing cookies or switching devices loses
+        it.
       </p>
 
       <h2>Refunds</h2>
       <p>
-        Ask within 14 days of paying and you get a full refund, no questions asked. If you lose Pro with your cookies,
-        you can ask for a refund at any time.
+        A verdict within 48 hours or a refund: if your poll hasn&apos;t closed with a result within 48 hours of paying,
+        ask and you get your money back. For any other reason, ask within 14 days of paying and you get a full refund,
+        no questions asked. If you lose Pro with your cookies, you can ask for a refund at any time. Refunds go back to
+        your card through Stripe.
       </p>
 
       <h2>Acceptable use</h2>
@@ -61,7 +63,10 @@ export default function TermsPage() {
             Email <a href={`mailto:${contact}`}>{contact}</a>.
           </>
         ) : (
-          <>If you bought Pro, reply to your Stripe receipt.</>
+          <>
+            Open an issue on <a href={ISSUES_URL}>GitHub</a>. Issues are public, so for anything about a payment, reply
+            to your Stripe receipt instead.
+          </>
         )}{' '}
         To flag a poll, use its Report button.
       </p>

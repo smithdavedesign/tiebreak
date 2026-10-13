@@ -1,29 +1,19 @@
 import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
+import { HOME_TITLE, JSON_LD, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
 import { VisitBeacon } from './visit-beacon'
 import './globals.css'
 
+// The title template, plus defaults for pages that set nothing (404s). Public pages set their own canonical
+// URL and share tags with pageMetadata(), and poll pages in generateMetadata, so none inherits the home page's.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: 'tiebreak — let strangers break the tie', template: '%s · tiebreak' },
+  title: { default: HOME_TITLE, template: `%s · ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
-  alternates: { canonical: '/' },
-  openGraph: { type: 'website', siteName: SITE_NAME, title: 'tiebreak — let strangers break the tie', description: SITE_DESCRIPTION, url: '/' },
-  twitter: { card: 'summary_large_image', title: 'tiebreak — let strangers break the tie', description: SITE_DESCRIPTION },
-}
-
-// Structured data for search: what the product is (no price listed until there's a public one).
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: SITE_NAME,
-  url: SITE_URL,
-  applicationCategory: 'LifestyleApplication',
-  operatingSystem: 'Web, iOS, Android',
-  description: SITE_DESCRIPTION,
+  openGraph: { type: 'website', siteName: SITE_NAME, title: HOME_TITLE, description: SITE_DESCRIPTION },
+  twitter: { card: 'summary_large_image', title: HOME_TITLE, description: SITE_DESCRIPTION },
 }
 
 export const viewport: Viewport = {
@@ -36,7 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD).replace(/</g, '\\u003c') }} />
         <header className="site-header">
           <Link href="/" className="brand">
             tiebreak

@@ -5,19 +5,19 @@
 ![Start page with a poll filled in, desktop](docs/screenshots/home-desktop.png)
 ![Start page with a poll filled in, phone](docs/screenshots/home-mobile.png)
 
-Posting a poll: a question, two options and a vote target, no sign-up.
-
-![Voting on the swipe card at 2 of 3 votes, desktop](docs/screenshots/vote-desktop.png)
-![Voting on the swipe card at 2 of 3 votes, phone](docs/screenshots/vote-mobile.png)
-
-The shared link: strangers swipe or tap to pick A or B while the vote count climbs toward the target.
+The core action, posting a poll: a question, two options and a vote target, no sign-up.
 
 ![Closed poll with the winner and vote split, desktop](docs/screenshots/result-desktop.png)
 ![Closed poll with the winner and vote split, phone](docs/screenshots/result-mobile.png)
 
-The third vote closes the poll and shows the winner with the split (2 to 1).
+Its result: two strangers voted on the shared link, the creator swiped the third vote, and the poll closed with the winner and the split (2 to 1).
 
-Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database and uses sample data only).
+![Pro page with the Buy button and the footer links, desktop](docs/screenshots/buy-desktop.png)
+![Pro page with the Buy button and the footer links, phone](docs/screenshots/buy-mobile.png)
+
+The Buy button ("Get Pro for $5", shown because `STRIPE_PAYMENT_LINK` is set, here to a placeholder) and the footer's Privacy and Terms links.
+
+Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data and a placeholder payment link only).
 
 People post two options, strangers swipe to pick one, and the poll closes at a vote target or deadline; sellers and creators pay a few dollars for a fast verdict instead of PickFu's $15+.
 

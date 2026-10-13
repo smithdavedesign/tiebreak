@@ -1,12 +1,15 @@
 // npm run screenshots: starts the app, drives the main job (post a poll, collect
-// votes, read the result) with Playwright at desktop and phone size, saves PNGs
-// to docs/screenshots/, and stops the app. Not part of `npm test`.
+// votes, read the result) with Playwright at desktop and phone size, then shows
+// the Pro page's Buy button and the footer links; saves PNGs to
+// docs/screenshots/ and stops the app. Not part of `npm test`.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
-// dev runs on an in-process Postgres (PGlite) with sample data only.
+// dev runs on an in-process Postgres (PGlite) with sample data only. The app
+// never sees a real database or Stripe setting from this shell: those variables
+// are dropped, and the Buy button gets a placeholder payment link.
 import { spawn } from 'node:child_process'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices } from 'playwright-core'
 
@@ -19,17 +22,31 @@ const QUESTION = 'Which photo for my ceramic mug listing?'
 const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
+const PLACEHOLDER_PAYMENT_LINK = 'https://example.com/pay'
+const SHOTS = ['home', 'result', 'buy']
+const SIZES = ['desktop', 'mobile']
 
 if (!process.env.CHROMIUM_PATH) {
   console.error('Set CHROMIUM_PATH to a Chromium or Chrome binary (no browser is downloaded).')
   process.exit(1)
 }
 
+// Sample data only: no real database, no real Stripe, no visit beacon (not production).
+const appEnv = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([name]) => name !== 'DATABASE_URL' && !name.startsWith('STRIPE_') && !name.endsWith('VERCEL_ENV'),
+  ),
+)
 const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port)], {
   cwd: root,
   detached: true,
   stdio: 'ignore',
-  env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', HOUSE_POLLS: 'off' },
+  env: {
+    ...appEnv,
+    NEXT_TELEMETRY_DISABLED: '1',
+    HOUSE_POLLS: 'off',
+    STRIPE_PAYMENT_LINK: PLACEHOLDER_PAYMENT_LINK,
+  },
 })
 const stopApp = () => {
   try {
@@ -64,13 +81,14 @@ async function strangerVotes(id, option) {
 async function run(browser, label, contextOptions) {
   const context = await browser.newContext(contextOptions)
   const page = await context.newPage()
-  // Viewport only, from the top of the page, without the Next dev-mode badge.
-  const shot = async (name) => {
+  // Viewport only, from the top of the page (or its bottom, to show the footer),
+  // without the Next dev-mode badge.
+  const shot = async (name, { bottom = false } = {}) => {
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
-    await page.evaluate(() => {
+    await page.evaluate((toBottom) => {
       document.activeElement?.blur()
-      window.scrollTo(0, 0)
-    })
+      window.scrollTo(0, toBottom ? document.documentElement.scrollHeight : 0)
+    }, bottom)
     await page.screenshot({ path: `${outDir}${name}-${label}.png` })
   }
 
@@ -83,7 +101,8 @@ async function run(browser, label, contextOptions) {
   await page.getByLabel('Close at').fill(String(TARGET))
   await shot('home')
 
-  // 2. Post it; two strangers vote; the creator reloads to see 2 of 3 and the swipe card.
+  // 2. Post it (the core action); two strangers vote; the creator swipes the
+  // last vote on the card, which closes the poll and shows its winner.
   await page.getByRole('button', { name: 'Create poll' }).click()
   await page.waitForURL(/\/p\/[^/?]+/)
   await page.getByText('Your poll is live').waitFor()
@@ -92,20 +111,32 @@ async function run(browser, label, contextOptions) {
   await strangerVotes(id, 0)
   await page.goto(`${base}/p/${id}`)
   await page.getByText(`2 of ${TARGET} votes`).waitFor()
-  await page.getByText(/left$/).waitFor()
-  await shot('vote')
-
-  // 3. The creator casts the last vote: the poll closes and shows its winner.
   await page.getByRole('button', { name: 'Pick A' }).click()
   await page.getByText(/^Winner:/).waitFor()
   await page.getByText(`Closed with ${TARGET} votes`).waitFor()
   await shot('result')
 
+  // 3. The Buy button (shown because STRIPE_PAYMENT_LINK is set) and the
+  // footer's Privacy and Terms links. Not clicked: the link is a placeholder.
+  await page.goto(`${base}/pro`)
+  await page.getByRole('button', { name: 'Get Pro for $5' }).waitFor()
+  await page.getByRole('link', { name: 'Terms & refunds' }).waitFor()
+  await shot('buy', { bottom: true })
+
   await context.close()
+}
+
+/** This script owns docs/screenshots/: PNGs from older runs that it no longer takes go. */
+async function removeStaleShots() {
+  const current = new Set(SHOTS.flatMap((name) => SIZES.map((size) => `${name}-${size}.png`)))
+  for (const file of await readdir(outDir)) {
+    if (file.endsWith('.png') && !current.has(file)) await rm(`${outDir}${file}`)
+  }
 }
 
 try {
   await mkdir(outDir, { recursive: true })
+  await removeStaleShots()
   await waitForApp()
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
   try {
@@ -114,7 +145,7 @@ try {
   } finally {
     await browser.close()
   }
-  console.log(`Saved 6 screenshots to docs/screenshots/`)
+  console.log(`Saved ${SHOTS.length * SIZES.length} screenshots to docs/screenshots/`)
 } finally {
   stopApp()
 }

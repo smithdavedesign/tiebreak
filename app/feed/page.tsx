@@ -1,16 +1,16 @@
-import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { getAccount } from '@/lib/credits'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
 import { VOTES_PER_CREDIT } from '@/lib/limits'
 import { listFeed } from '@/lib/polls'
+import { pageMetadata } from '@/lib/site'
 import { FeedView } from './feed-view'
 
-export const metadata: Metadata = {
-  title: 'Public feed',
-  description: 'Swipe through open polls and help strangers decide. Every 5 votes earns you a public poll of your own.',
-  alternates: { canonical: '/feed' },
-}
+export const metadata = pageMetadata(
+  '/feed',
+  'Public feed',
+  `Swipe through open polls and help strangers decide. Every ${VOTES_PER_CREDIT} votes earns you a public poll of your own.`,
+)
 
 /** The public feed: swipe through strangers' polls and earn posting credits. */
 export default async function FeedPage() {

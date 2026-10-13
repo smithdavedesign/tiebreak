@@ -1,8 +1,9 @@
 import { ImageResponse } from 'next/og'
+import { SHARE_IMAGE } from '@/lib/site'
 
 // The share card for every page (1200×630), drawn with code at build time.
-export const alt = 'tiebreak: post two options, let people swipe to pick one'
-export const size = { width: 1200, height: 630 }
+export const alt = SHARE_IMAGE.alt
+export const size = { width: SHARE_IMAGE.width, height: SHARE_IMAGE.height }
 export const contentType = 'image/png'
 
 export default function OpengraphImage() {

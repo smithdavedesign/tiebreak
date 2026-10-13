@@ -1,18 +1,21 @@
-import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
 import { confirmCheckout, getPlan } from '@/lib/plans'
-import { getProPrice } from '@/lib/stripe'
+import { PRICE, pageMetadata } from '@/lib/site'
+import { getProPrice, paymentsReady } from '@/lib/stripe'
 import { UpgradeButton } from './upgrade-button'
 
-export const metadata: Metadata = {
-  title: 'Pro',
-  description: 'tiebreak Pro: private polls where only you see the result, and CSV export of your votes. One-time payment.',
-  alternates: { canonical: '/pro' },
-}
+export const metadata = pageMetadata(
+  '/pro',
+  'Pro',
+  `tiebreak Pro: private polls where only you see the result, and CSV export of your votes. ${PRICE.label}, paid once.`,
+)
 
-/** What Pro adds and the upgrade button; also Stripe Checkout's return page (?session_id=…). */
+/**
+ * What Pro adds and the Buy button; also Stripe Checkout's return page (?session_id=…). The button shows
+ * only when payments are set up (STRIPE_PAYMENT_LINK in production), so nobody clicks into an error.
+ */
 export default async function ProPage({
   searchParams,
 }: {
@@ -26,7 +29,8 @@ export default async function ProPage({
   // recommended pattern; both paths record the same payment once).
   if (returned) await confirmCheckout(sessionId)
   const plan = await getPlan(viewer)
-  const price = plan === 'pro' ? null : await getProPrice()
+  const forSale = plan === 'free' && paymentsReady()
+  const price = forSale ? await getProPrice() : null
 
   return (
     <>
@@ -56,6 +60,11 @@ export default async function ProPage({
         <Link className="button" href="/">
           Create a private poll
         </Link>
+      ) : !forSale ? (
+        <p className="card">
+          Pro isn&apos;t on sale yet. Everything else in tiebreak is free, so <Link href="/">post a poll</Link> in the
+          meantime.
+        </p>
       ) : (
         <div className="card">
           <p>

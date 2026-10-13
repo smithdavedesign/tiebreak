@@ -10,7 +10,7 @@ Done 2026-10-12, so idea-factory's go-live audit (`lib/golive.js`) passes on the
   - poll share pages get their question as the title and are kept out of search (`noindex`), since they're people's links, not pages to find.
 - **robots.txt and sitemap.xml** (`app/robots.ts`, `app/sitemap.ts`). The sitemap lists `/`, `/feed`, `/pro`, `/privacy` and `/terms`; the API and checkout are disallowed.
 - **Privacy** (`/privacy`, new) and **Terms and refunds** (`/terms`, now with a no-warranty line). Both are linked from the footer and from the app's "You" screen.
-- **Visit beacon:** the home page sends one anonymous view (`{slug, kind: "view", referrer}`) to RepoHQ's counter, so the Ideas page counts real visitors. It sets no cookie and sends no id, and the privacy page says so.
+- **Funnel beacon:** replaced the home-page-only view beacon on 2026-10-13 (see GROWTH.md): `visit`, `activate` and `checkout` events (`{slug, kind, referrer}`) go to RepoHQ's counter. It sets no cookie and sends no id, and the privacy page says so.
 - **Site URL:** `lib/site.ts`. `NEXT_PUBLIC_SITE_URL` overrides it, which is what to set for a custom domain.
 - **Payment link: none added.** There's no `REVENUE.md` price yet, and Pro already has its own Stripe checkout from M3.
 

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
+import { sendSignal } from '@/lib/beacon'
 import type { AccountView } from '@/lib/credits'
 import {
   MAX_OPTION_TEXT_LENGTH,
@@ -66,6 +67,7 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
         setBusy(false)
         return
       }
+      sendSignal('activate')
       router.push(`/p/${body.id}?new=1`)
     } catch {
       setError('Network error. Try again.')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { sendSignal } from '@/lib/beacon'
 
 /** Starts Stripe Checkout: POST /checkout, then on to Stripe's hosted payment page. */
 export function UpgradeButton({ price }: { price: string | null }) {
@@ -8,6 +9,7 @@ export function UpgradeButton({ price }: { price: string | null }) {
   const [error, setError] = useState<string | null>(null)
 
   async function upgrade() {
+    sendSignal('checkout')
     setBusy(true)
     setError(null)
     try {

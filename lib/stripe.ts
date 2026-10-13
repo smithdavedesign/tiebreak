@@ -9,6 +9,7 @@
 // STRIPE_* environment variables; nothing here touches the database, and the
 // secrets never leave the server.
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { PRICE } from './site'
 
 const API = 'https://api.stripe.com/v1'
 
@@ -67,6 +68,11 @@ export function paymentLink(): string | null {
   }
 }
 
+/** Whether Checkout can start at all (a Payment Link, or the key and price): the Buy button shows only then. */
+export function paymentsReady(): boolean {
+  return paymentLink() !== null || settings() !== null
+}
+
 /** The link for this account: Stripe copies client_reference_id onto the Checkout Session it creates. */
 export function paymentLinkFor(link: string, accountId: string): string {
   const url = new URL(link)
@@ -115,11 +121,16 @@ export function formatPrice(unitAmount: number, currency: string): string {
   return format.format(unitAmount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2))
 }
 
-/** The Pro price as a label, read from Stripe so the page and Checkout agree; null if unknown. */
+/**
+ * The Pro price as a label: provision's label, else REVENUE.md's price for a Payment Link, else read
+ * from Stripe so the page and Checkout agree; null if unknown.
+ */
 export async function getProPrice(): Promise<string | null> {
-  // With a Payment Link there's no API key to look the price up: provision sets this label.
+  // With a Payment Link there's no API key to look the price up: provision sets this label, and
+  // without it the link is the one REVENUE.md priced.
   const label = process.env.STRIPE_PRICE_LABEL?.trim()
   if (label) return label
+  if (paymentLink()) return PRICE.label
   const config = settings()
   if (!config) return null
   const price = await call(config.secretKey, `/prices/${encodeURIComponent(config.priceId)}`)

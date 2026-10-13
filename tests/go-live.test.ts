@@ -39,10 +39,11 @@ describe('privacy and terms', () => {
 })
 
 describe('search and share metadata', () => {
-  it('has a title, description, canonical URL, Open Graph and a large Twitter card', () => {
+  // Canonical URLs are per page (each sets its own; see tests/launch.test.ts), so the layout sets none.
+  it('has a title, description, Open Graph and a large Twitter card, and no site-wide canonical', () => {
     expect(metadata.metadataBase?.toString()).toBe(`${SITE_URL}/`)
     expect(metadata.description).toBeTruthy()
-    expect(metadata.alternates?.canonical).toBe('/')
+    expect(metadata.alternates).toBeUndefined()
     expect(metadata.openGraph).toMatchObject({ siteName: 'tiebreak' })
     expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' })
   })

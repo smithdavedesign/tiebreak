@@ -3,7 +3,10 @@ import Link from 'next/link'
 import { getAccount } from '@/lib/credits'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
 import { getPlan } from '@/lib/plans'
+import { SITE_DESCRIPTION, pageMetadata } from '@/lib/site'
 import { CreatePollForm } from './create-poll-form'
+
+export const metadata = pageMetadata('/', null, SITE_DESCRIPTION)
 
 export default async function HomePage() {
   const voter = (await cookies()).get(VOTER_COOKIE)?.value

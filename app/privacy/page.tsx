@@ -1,11 +1,11 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ISSUES_URL, pageMetadata } from '@/lib/site'
 
-export const metadata: Metadata = {
-  title: 'Privacy',
-  description: 'What tiebreak stores (an anonymous id, your polls and votes), what it never collects, and who else sees anything.',
-  alternates: { canonical: '/privacy' },
-}
+export const metadata = pageMetadata(
+  '/privacy',
+  'Privacy',
+  'What tiebreak stores (an anonymous id, your polls and votes), its one cookie, what it never collects, and who else sees anything.',
+)
 
 /** What's stored and why, in plain language. Keep it true when the product changes. */
 export default function PrivacyPage() {
@@ -31,6 +31,14 @@ export default function PrivacyPage() {
           currency, which we keep to answer refund requests.
         </li>
       </ul>
+
+      <h2>Cookies</h2>
+      <p>
+        One, because the site needs it: <code>tb_voter</code> holds the random id above, so your polls, votes and credits
+        stay yours. It lasts a year, only this site can read it, and it isn&apos;t used for ads or tracking. We set no
+        other cookies, and nobody else sets any on this site. Stripe&apos;s checkout page, on Stripe&apos;s own site, has
+        its own.
+      </p>
 
       <h2>Visit counting</h2>
       <p>
@@ -58,7 +66,7 @@ export default function PrivacyPage() {
           </>
         ) : (
           <>
-            Open an issue on <a href="https://github.com/smithdavedesign/tiebreak/issues">GitHub</a>
+            Open an issue on <a href={ISSUES_URL}>GitHub</a> (issues are public, so leave out anything private)
           </>
         )}{' '}
         to ask what&apos;s stored for your id or to have it deleted. See also the <Link href="/terms">terms and refunds</Link>.

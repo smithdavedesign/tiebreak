@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
 import { getPlan } from '@/lib/plans'
 import { getPoll } from '@/lib/polls'
+import { SHARE_IMAGE, SITE_NAME } from '@/lib/site'
 import { PollView } from './poll-view'
 
 /** A poll's own title on its share card; kept out of search (it's someone's link, not a page to find). */
@@ -11,11 +12,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params
   const poll = await getPoll(id, null).catch(() => null)
   const title = poll?.question || 'Help me decide'
+  const description = poll
+    ? `Swipe to vote: ${poll.options.map((o, i) => o.text || `option ${'ABCD'[i]}`).join(' or ')}.`
+    : undefined
   return {
     title,
-    description: poll ? `Swipe to vote: ${poll.options.map((o, i) => o.text || `option ${'ABCD'[i]}`).join(' or ')}.` : undefined,
+    description,
     robots: { index: false, follow: false },
-    openGraph: { title },
+    // Replaces the layout's share tags wholesale, so the site name and image go in again.
+    openGraph: { type: 'website', siteName: SITE_NAME, url: `/p/${id}`, title, description, images: [SHARE_IMAGE] },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 

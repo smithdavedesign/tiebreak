@@ -1,13 +1,13 @@
 // npm run screenshots: starts the app, drives the main job (post a poll, collect
 // votes, read the result) with Playwright at desktop and phone size, then shows
-// the Pro page's Buy button and the footer links; saves PNGs to
+// one of the search pages (/which-etsy-photo-is-best); saves PNGs to
 // docs/screenshots/ and stops the app. Not part of `npm test`.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
 // dev runs on an in-process Postgres (PGlite) with sample data only. The app
 // never sees a real database or Stripe setting from this shell: those variables
-// are dropped, and the Buy button gets a placeholder payment link.
+// are dropped.
 import { spawn } from 'node:child_process'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -22,8 +22,7 @@ const QUESTION = 'Which photo for my ceramic mug listing?'
 const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
-const PLACEHOLDER_PAYMENT_LINK = 'https://example.com/pay'
-const SHOTS = ['home', 'result', 'buy']
+const SHOTS = ['home', 'result', 'guide']
 const SIZES = ['desktop', 'mobile']
 
 if (!process.env.CHROMIUM_PATH) {
@@ -45,7 +44,6 @@ const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '
     ...appEnv,
     NEXT_TELEMETRY_DISABLED: '1',
     HOUSE_POLLS: 'off',
-    STRIPE_PAYMENT_LINK: PLACEHOLDER_PAYMENT_LINK,
   },
 })
 const stopApp = () => {
@@ -116,12 +114,11 @@ async function run(browser, label, contextOptions) {
   await page.getByText(`Closed with ${TARGET} votes`).waitFor()
   await shot('result')
 
-  // 3. The Buy button (shown because STRIPE_PAYMENT_LINK is set) and the
-  // footer's Privacy and Terms links. Not clicked: the link is a placeholder.
-  await page.goto(`${base}/pro`)
-  await page.getByRole('button', { name: 'Get Pro for $5' }).waitFor()
-  await page.getByRole('link', { name: 'Terms & refunds' }).waitFor()
-  await shot('buy', { bottom: true })
+  // 3. A search page: the Etsy photo guide, which ends in a link back to post a poll.
+  await page.goto(`${base}/which-etsy-photo-is-best`)
+  await page.getByRole('heading', { name: 'Which Etsy listing photo is best?' }).waitFor()
+  await page.getByRole('link', { name: 'Post your poll' }).waitFor()
+  await shot('guide')
 
   await context.close()
 }

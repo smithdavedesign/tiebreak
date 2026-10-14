@@ -401,3 +401,17 @@ button.danger {
 .site-footer a {
   color: var(--muted);
 }
+
+/* Search pages: links to them from the footer and the home page, and the closing "try it" block */
+.guide-links {
+  margin: 0.5rem 0;
+}
+
+.guide-cta {
+  margin-top: 1.5rem;
+  justify-content: space-between;
+}
+
+.guide-cta p {
+  margin: 0;
+}

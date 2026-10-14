@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { GUIDES } from '@/lib/guides'
 import { HOME_TITLE, JSON_LD, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
 import { VisitBeacon } from './visit-beacon'
 import './globals.css'
@@ -40,6 +41,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <main>{children}</main>
         <VisitBeacon />
         <footer className="site-footer">
+          <p className="guide-links">
+            {GUIDES.map((g, i) => (
+              <span key={g.path}>
+                {i > 0 && ' · '}
+                <Link href={g.path}>{g.label}</Link>
+              </span>
+            ))}
+          </p>
           <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms &amp; refunds</Link>
         </footer>
       </body>

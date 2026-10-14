@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { getAccount } from '@/lib/credits'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
+import { GUIDES } from '@/lib/guides'
 import { getPlan } from '@/lib/plans'
 import { SITE_DESCRIPTION, pageMetadata } from '@/lib/site'
 import { CreatePollForm } from './create-poll-form'
@@ -25,6 +26,15 @@ export default async function HomePage() {
         posting there.
       </p>
       <CreatePollForm account={account} plan={plan} />
+      <p className="hint guide-links">
+        Not sure how to choose?{' '}
+        {GUIDES.map((g, i) => (
+          <span key={g.path}>
+            {i > 0 && ' · '}
+            <Link href={g.path}>{g.label}</Link>
+          </span>
+        ))}
+      </p>
     </>
   )
 }

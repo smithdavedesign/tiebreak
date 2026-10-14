@@ -26,6 +26,9 @@ const feed = await import('@/app/feed/page')
 const pro = await import('@/app/pro/page')
 const privacy = await import('@/app/privacy/page')
 const terms = await import('@/app/terms/page')
+const pickfu = await import('@/app/pickfu-alternative/page')
+const etsy = await import('@/app/which-etsy-photo-is-best/page')
+const thumbnail = await import('@/app/choose-a-thumbnail-or-book-cover/page')
 
 useTestDb()
 
@@ -36,6 +39,9 @@ const PAGES: Record<(typeof PUBLIC_PAGES)[number], { metadata: Metadata; render:
   '/pro': { metadata: pro.metadata, render: () => pro.default(noQuery) },
   '/privacy': { metadata: privacy.metadata, render: () => privacy.default() },
   '/terms': { metadata: terms.metadata, render: () => terms.default() },
+  '/pickfu-alternative': { metadata: pickfu.metadata, render: () => pickfu.default() },
+  '/which-etsy-photo-is-best': { metadata: etsy.metadata, render: () => etsy.default() },
+  '/choose-a-thumbnail-or-book-cover': { metadata: thumbnail.metadata, render: () => thumbnail.default() },
 }
 const entries = Object.entries(PAGES)
 

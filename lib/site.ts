@@ -14,7 +14,16 @@ export const SITE_DESCRIPTION =
   "Can't choose? Post 2–4 options, share the link, and let people swipe to pick one. The poll closes at your vote target or deadline."
 
 /** The public pages search engines should list (poll pages are people's own links, so they're left out). */
-export const PUBLIC_PAGES = ['/', '/feed', '/pro', '/privacy', '/terms'] as const
+export const PUBLIC_PAGES = [
+  '/',
+  '/feed',
+  '/pro',
+  '/privacy',
+  '/terms',
+  '/pickfu-alternative',
+  '/which-etsy-photo-is-best',
+  '/choose-a-thumbnail-or-book-cover',
+] as const
 
 /** RepoHQ's visit counter for idea products (anonymous: no cookies, an hourly-limited IP hash). */
 export const SIGNAL_URL = 'https://repohq.vercel.app/api/ideas/signal'

@@ -6,6 +6,7 @@ import { accountOf, lockAccount, type AccountView } from './credits'
 import { toCsv } from './csv'
 import { getDb, type Sql } from './db'
 import { HOUSE_ID, houseEnabled, stockHouse } from './house'
+import { claimUploads, firstMissingUpload, imagePath, uploadedImageId, type Upload } from './images'
 import {
   FEED_PAGE_SIZE,
   MAX_HOURS,
@@ -54,6 +55,8 @@ export interface NewPoll {
   target: number
   durationHours: number
   visibility: Visibility
+  /** Options whose image is a photo uploaded to tiebreak rather than a link. */
+  uploads: Upload[]
 }
 
 export interface PollView {
@@ -102,29 +105,41 @@ const isIntIn = (value: unknown, min: number, max: number): value is number =>
 const isVisibility = (value: unknown): value is Visibility =>
   (VISIBILITIES as readonly unknown[]).includes(value)
 
-function parseImageUrl(value: unknown): string | null | undefined {
-  if (value === undefined || value === null || value === '') return null
+/**
+ * An option's image: an https link, or a photo uploaded to this server (its URL on
+ * `ownOrigin`, which is plain http in local dev). Undefined if it's neither.
+ */
+function parseImageUrl(
+  value: unknown,
+  ownOrigin: string | undefined,
+): { imageUrl: string | null; upload: string | null } | undefined {
+  if (value === undefined || value === null || value === '') return { imageUrl: null, upload: null }
   if (typeof value !== 'string' || value.length > MAX_URL_LENGTH) return undefined
+  let url: URL
   try {
-    return new URL(value).protocol === 'https:' ? value : undefined
+    url = new URL(value)
   } catch {
     return undefined
   }
+  const upload = ownOrigin === undefined ? null : uploadedImageId(url, ownOrigin)
+  if (upload !== null) return { imageUrl: ownOrigin + imagePath(upload), upload }
+  return url.protocol === 'https:' ? { imageUrl: value, upload: null } : undefined
 }
 
-function parseOption(value: unknown): Option | undefined {
+function parseOption(value: unknown, ownOrigin: string | undefined): { option: Option; upload: string | null } | undefined {
   const raw = typeof value === 'string' ? { text: value } : value
   if (!isRecord(raw)) return undefined
   if (raw.text !== undefined && raw.text !== null && typeof raw.text !== 'string') return undefined
   const text = typeof raw.text === 'string' && raw.text.trim() !== '' ? raw.text.trim() : null
-  const imageUrl = parseImageUrl(raw.imageUrl)
-  if (imageUrl === undefined) return undefined
-  if (text === null && imageUrl === null) return undefined
+  const image = parseImageUrl(raw.imageUrl, ownOrigin)
+  if (image === undefined) return undefined
+  if (text === null && image.imageUrl === null) return undefined
   if (text !== null && text.length > MAX_OPTION_TEXT_LENGTH) return undefined
-  return { text, imageUrl }
+  return { option: { text, imageUrl: image.imageUrl }, upload: image.upload }
 }
 
-export function parseNewPoll(input: unknown): Parsed<NewPoll> {
+/** `ownOrigin` is this server's (from the request): option URLs on it are photos uploaded here. */
+export function parseNewPoll(input: unknown, ownOrigin?: string): Parsed<NewPoll> {
   if (!isRecord(input)) return { ok: false, error: 'Send a JSON object' }
 
   const { question = '', options, target, durationHours, visibility = 'unlisted' } = input
@@ -135,15 +150,17 @@ export function parseNewPoll(input: unknown): Parsed<NewPoll> {
     return { ok: false, error: `options must list ${MIN_OPTIONS} to ${MAX_OPTIONS} choices` }
   }
   const parsedOptions: Option[] = []
+  const uploads: Upload[] = []
   for (const [i, option] of options.entries()) {
-    const parsed = parseOption(option)
+    const parsed = parseOption(option, ownOrigin)
     if (!parsed) {
       return {
         ok: false,
-        error: `option ${i + 1} needs text (at most ${MAX_OPTION_TEXT_LENGTH} characters) or an https image URL`,
+        error: `option ${i + 1} needs text (at most ${MAX_OPTION_TEXT_LENGTH} characters), a photo or an https image URL`,
       }
     }
-    parsedOptions.push(parsed)
+    parsedOptions.push(parsed.option)
+    if (parsed.upload !== null) uploads.push({ option: i, id: parsed.upload })
   }
   if (!isIntIn(target, MIN_TARGET, MAX_TARGET)) {
     return { ok: false, error: `target must be a whole number from ${MIN_TARGET} to ${MAX_TARGET}` }
@@ -156,7 +173,7 @@ export function parseNewPoll(input: unknown): Parsed<NewPoll> {
   }
   return {
     ok: true,
-    value: { question: question.trim(), options: parsedOptions, target, durationHours, visibility },
+    value: { question: question.trim(), options: parsedOptions, target, durationHours, visibility, uploads },
   }
 }
 
@@ -250,13 +267,17 @@ export type CreateResult =
   | { kind: 'ok'; poll: PollView }
   | { kind: 'no_credits'; account: AccountView }
   | { kind: 'needs_pro' }
+  /** The photo uploaded for this option is gone (unused for a day, or never uploaded). */
+  | { kind: 'missing_upload'; option: number }
 
 /**
  * Creates a poll owned by `creatorId`. Unlisted polls are free; a private poll
  * needs Pro; a public poll spends one posting credit, checked and spent under
  * the account's lock so concurrent posts can't spend the same credit twice.
+ * Uploaded photos are checked and tied to the poll in the same transaction.
  *
- *   BEGIN; lock(account); count credits; < cost → 403; INSERT; COMMIT
+ *   BEGIN; [lock(account); count credits; < cost → 403;]
+ *          [lock photos; one missing → 400;] INSERT; [claim photos;] COMMIT
  *
  * The Pro check needs no lock: an account never goes from Pro back to free.
  */
@@ -264,8 +285,13 @@ export async function createPoll(poll: NewPoll, creatorId: string, now = new Dat
   const db = await getDb()
   const { credits: cost, pro } = REQUIRES[poll.visibility]
   if (pro && (await planOf(db, creatorId)) !== 'pro') return { kind: 'needs_pro' }
+  const hasUploads = poll.uploads.length > 0
 
   const insert = async (sql: Sql): Promise<CreateResult> => {
+    if (hasUploads) {
+      const option = await firstMissingUpload(sql, poll.uploads)
+      if (option !== null) return { kind: 'missing_upload', option }
+    }
     const id = randomBytes(9).toString('base64url')
     const closesAt = new Date(now.getTime() + poll.durationHours * HOUR_MS)
     const { rows } = await sql.query<PollRow>(
@@ -283,14 +309,17 @@ export async function createPoll(poll: NewPoll, creatorId: string, now = new Dat
         creatorId,
       ],
     )
+    if (hasUploads) await claimUploads(sql, id, poll.uploads)
     return { kind: 'ok', poll: viewOf(rows[0], creatorId, { voteCount: 0, tally: null }, null) }
   }
 
-  if (cost === 0) return insert(db)
+  if (cost === 0 && !hasUploads) return insert(db)
   return db.transaction(async (tx): Promise<CreateResult> => {
-    await lockAccount(tx, creatorId)
-    const account = await accountOf(tx, creatorId)
-    if (account.credits < cost) return { kind: 'no_credits', account }
+    if (cost > 0) {
+      await lockAccount(tx, creatorId)
+      const account = await accountOf(tx, creatorId)
+      if (account.credits < cost) return { kind: 'no_credits', account }
+    }
     return insert(tx)
   })
 }

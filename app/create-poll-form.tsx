@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { sendSignal } from '@/lib/beacon'
 import type { AccountView } from '@/lib/credits'
 import {
+  IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
   MAX_OPTION_TEXT_LENGTH,
   MAX_OPTIONS,
   MAX_QUESTION_LENGTH,
@@ -26,8 +28,28 @@ const DURATIONS = [
 const DEFAULT_TARGET = 10
 const DEFAULT_HOURS = 24
 
-type Draft = { text: string; imageUrl: string }
-const blank = (): Draft => ({ text: '', imageUrl: '' })
+const PHOTO_ACCEPT = IMAGE_TYPES.join(',')
+const PHOTO_HINT = `JPEG, PNG or WebP, up to ${MAX_IMAGE_BYTES / 1_000_000} MB`
+
+type Draft = {
+  text: string
+  imageUrl: string
+  /** A photo picked from the device. It's uploaded when the poll is posted, and wins over the link. */
+  photo: File | null
+  /** The photo's URL on tiebreak once uploaded, so posting again doesn't upload it twice. */
+  uploaded: string | null
+  /** Why the photo was refused, shown in this option. */
+  photoError: string | null
+}
+const blank = (): Draft => ({ text: '', imageUrl: '', photo: null, uploaded: null, photoError: null })
+
+/** The message for a refused upload: the server's own, else one for the status. */
+function uploadError(status: number, body: { error?: unknown } | null) {
+  if (typeof body?.error === 'string') return body.error
+  // Vercel refuses a request body over 4.5 MB itself, before the app sees it.
+  if (status === 413) return 'That photo is too big to upload. Try a smaller copy of it.'
+  return "The photo didn't upload. Try again."
+}
 
 export function CreatePollForm({ account, plan }: { account: AccountView; plan: Plan }) {
   const router = useRouter()
@@ -39,23 +61,57 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
   // Private (Pro) and public are exclusive: a private poll never goes to the feed.
   const [isPrivate, setIsPrivate] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<false | 'uploading' | 'creating'>(false)
   const canPostPublic = account.credits > 0
 
   const update = (i: number, patch: Partial<Draft>) =>
     setOptions((all) => all.map((o, j) => (j === i ? { ...o, ...patch } : o)))
 
+  /**
+   * Uploads each picked photo that isn't up yet, all at once. Returns each option's
+   * photo URL (null without a photo), or null if any was refused: its option says why.
+   */
+  async function uploadPhotos(): Promise<(string | null)[] | null> {
+    const results = await Promise.all(
+      options.map(async (o, i): Promise<string | null | false> => {
+        if (!o.photo) return null
+        if (o.uploaded) return o.uploaded
+        const res = await fetch('/images', {
+          method: 'POST',
+          headers: { 'content-type': o.photo.type || 'application/octet-stream' },
+          body: o.photo,
+        })
+        const body = await res.json().catch(() => null)
+        if (res.status === 201 && typeof body?.url === 'string') {
+          update(i, { uploaded: body.url })
+          return body.url
+        }
+        update(i, { photoError: uploadError(res.status, body) })
+        return false
+      }),
+    )
+    return results.includes(false) ? null : (results as (string | null)[])
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault()
-    setBusy(true)
     setError(null)
+    setOptions((all) => all.map((o) => ({ ...o, photoError: null })))
     try {
+      // Photos go up first; the poll is posted only once every one is stored.
+      setBusy(options.some((o) => o.photo && !o.uploaded) ? 'uploading' : 'creating')
+      const photos = await uploadPhotos()
+      if (!photos) {
+        setBusy(false)
+        return
+      }
+      setBusy('creating')
       const res = await fetch('/polls', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           question,
-          options: options.map((o) => ({ text: o.text, imageUrl: o.imageUrl.trim() || undefined })),
+          options: options.map((o, i) => ({ text: o.text, imageUrl: photos[i] ?? (o.imageUrl.trim() || undefined) })),
           target: Number(target),
           durationHours,
           visibility: isPrivate ? 'private' : isPublic ? 'public' : 'unlisted',
@@ -63,7 +119,9 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
       })
       const body = await res.json().catch(() => null)
       if (res.status !== 201) {
-        setError(body?.error ?? 'Something went wrong. Try again.')
+        // A stored photo that can't be used any more is uploaded again next time.
+        if (typeof body?.option === 'number') update(body.option, { uploaded: null, photoError: body.error })
+        else setError(body?.error ?? 'Something went wrong. Try again.')
         setBusy(false)
         return
       }
@@ -97,13 +155,46 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
             placeholder="Text"
             onChange={(e) => update(i, { text: e.target.value })}
           />
-          <input
-            aria-label={`Option ${LETTERS[i]} image URL`}
-            type="url"
-            value={option.imageUrl}
-            placeholder="https:// image link (optional)"
-            onChange={(e) => update(i, { imageUrl: e.target.value })}
-          />
+          {option.photo ? (
+            <div className="photo">
+              <Thumbnail file={option.photo} alt={`Option ${LETTERS[i]} photo preview`} />
+              <button
+                type="button"
+                className="link"
+                onClick={() => update(i, { photo: null, uploaded: null, photoError: null })}
+              >
+                Remove photo
+              </button>
+            </div>
+          ) : (
+            <input
+              aria-label={`Option ${LETTERS[i]} image URL`}
+              type="url"
+              value={option.imageUrl}
+              placeholder="https:// image link (optional)"
+              onChange={(e) => update(i, { imageUrl: e.target.value })}
+            />
+          )}
+          <label className="photo-pick">
+            <input
+              type="file"
+              className="visually-hidden"
+              accept={PHOTO_ACCEPT}
+              aria-label={`Option ${LETTERS[i]} photo`}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) update(i, { photo: file, uploaded: null, photoError: null })
+                e.target.value = '' // so picking the same file again still counts
+              }}
+            />
+            <span className="pick">{option.photo ? 'Change photo' : 'Upload a photo'}</span>
+            <span className="hint">{PHOTO_HINT}</span>
+          </label>
+          {option.photoError && (
+            <p className="error" role="alert">
+              {option.photoError}
+            </p>
+          )}
           {options.length > MIN_OPTIONS && (
             <button
               type="button"
@@ -187,9 +278,26 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
           {error}
         </p>
       )}
-      <button type="submit" disabled={busy}>
-        {busy ? 'Creating…' : 'Create poll'}
+      <button type="submit" disabled={busy !== false}>
+        {busy === 'uploading' ? 'Uploading photos…' : busy === 'creating' ? 'Creating…' : 'Create poll'}
       </button>
     </form>
   )
+}
+
+/**
+ * A picked photo's preview, drawn from the file itself before anything is uploaded.
+ * The object URL lives as long as this thumbnail. A file the browser can't draw
+ * shows its name instead.
+ */
+function Thumbnail({ file, alt }: { file: File; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    setSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+  if (!src || failed === src) return <span className="photo-name">{file.name}</span>
+  return <img className="thumb" src={src} alt={alt} onError={() => setFailed(src)} />
 }

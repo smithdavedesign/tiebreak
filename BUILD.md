@@ -491,6 +491,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
 - **The header** links to the Feed, New poll and **Pro** (new in M3). **New in M3:** a footer links to Terms, refunds & privacy.
 - **`/`**: create a poll.
   - An optional question and 2–4 options. Each option has text, an https image link, or both.
+    - **New (growth, 2026-10-19):** or a photo from the device instead of the link ("Upload a photo": JPEG, PNG or WebP, up to 5 MB). A thumbnail shows in the option at once; the photos upload when the poll is posted, and a refused one says why in its own option, with no poll created.
   - A vote target (default 10) and a time limit from 1 hour to 7 days (default 24h).
   - **New in M2:** a checkbox, "Also post it to the public feed so strangers vote (uses 1 of your N credits)".
     - With 0 credits the box is disabled. The form explains that link-only polls are free, and that you earn a credit by voting on N more polls in the feed.
@@ -535,7 +536,13 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - `403 {error, account}` for a public poll without a credit;
     - `403 {error, plan: "free"}` for a private poll without Pro (new in M3);
     - `415` for a non-JSON body.
+    - `400 {error, option}` when that option's uploaded photo is gone (new with photo upload).
     - `visibility` defaults to `unlisted`. The account cookie is set if missing.
+    - An option's `imageUrl` is an https link, or a URL from `POST /images` (on this site, so plain http in local dev).
+  - **New with photo upload (growth, 2026-10-19):**
+    - `POST /images`, body: the photo's bytes with an `image/*` type → `201 {id, url}`, or `400` (empty), `413` (over 5 MB), `415` (not image/*, or the bytes aren't a JPEG, PNG or WebP), `422` (over 64 megapixels) and `503` (photo storage full). The account cookie is set if missing.
+      - The photo is checked by its bytes and cleaned before it's stored (`lib/images.ts`): JPEG EXIF (GPS, camera), XMP, IPTC, comments and extra pictures go, and the orientation comes back as a one-tag EXIF; PNG and WebP keep only the chunks that draw the image.
+    - `GET /images/:id` → `200` the photo (its checked type, `nosniff`, `public, max-age=86400, s-maxage=86400, immutable`), or `404` (`no-store`) until a poll uses it.
   - `GET /polls/:id` → `200 {poll}`, closing the poll first if it's past its deadline; or `404`.
   - `POST /polls/:id/votes` `{option}` → `201 {poll, account}`, or 400/404/409/410/415.
   - `POST /polls/:id/reports` `{}` → `201 {reported: true}`, or 400/404, 409 (already reported) and 415.
@@ -615,7 +622,7 @@ npm run build        # production build plus type check
    - in test mode, buy Pro with 4242 4242 4242 4242, create a private poll, close it, and download the CSV.
    - In Stripe → Webhooks, the delivery shows `200`.
 
-Cost: $0 to run (Vercel Hobby, Neon free, Stripe with no monthly fee; Stripe keeps a per-payment fee from revenue only). No paid services, domains, cron jobs or image storage.
+Cost: $0 to run (Vercel Hobby, Neon free, Stripe with no monthly fee; Stripe keeps a per-payment fee from revenue only). No paid services, domains or cron jobs. Uploaded photos (growth, 2026-10-19) live in the same Neon database, in the `images` table, capped at 200 MB (`IMAGE_STORAGE_BUDGET_BYTES`): past that, uploads answer 503 and image links still work.
 
 Committing:
 - The dynamic-route folders are:
@@ -683,7 +690,7 @@ SELECT account_id, count(*) FROM payments GROUP BY account_id HAVING count(*) > 
 ```
 - **A refund** is done in the Stripe dashboard. To also take Pro away, run `DELETE FROM payments WHERE session_id = 'cs_…'`. Private polls already created stay private.
 - **Not built from the PRD's paid tier: higher vote targets.** ROADMAP's M3 doesn't list them. The follow-up is a per-plan `MAX_TARGET` in `lib/limits.ts`, checked with the plan after validation, the same way `private` is.
-- **New DDL still goes last in `SCHEMA` (`lib/db.ts`),** with `SCHEMA_SENTINEL` pointed at the table or index it creates. It's now `payments_account_idx`.
+- **New DDL still goes last in `SCHEMA` (`lib/db.ts`),** with `SCHEMA_SENTINEL` pointed at the table or index it creates. It's now `images_unused_idx` (photo upload).
 
 - **Moderation, by hand for now.** The owner can list hidden polls in the Neon SQL editor:
   ```sql
@@ -691,7 +698,11 @@ SELECT account_id, count(*) FROM payments GROUP BY account_id HAVING count(*) > 
     FROM polls p JOIN reports r ON r.poll_id = p.id
    GROUP BY p.id HAVING count(*) >= 3 ORDER BY last_report DESC;
   ```
-  Removing a poll is `DELETE FROM polls WHERE id = '…'`, which cascades to its votes and reports. Note that this lowers its voters' counted votes.
+  Removing a poll is `DELETE FROM polls WHERE id = '…'`, which cascades to its votes, reports and uploaded photos. Note that this lowers its voters' counted votes. A deleted photo can still come from the CDN for up to a day; Vercel › Project › Settings › Caches › Purge CDN Cache clears it at once.
+  Photo storage at a glance (growth, 2026-10-19):
+  ```sql
+  SELECT count(*) AS photos, pg_size_pretty(sum(bytes)) AS stored, count(*) FILTER (WHERE poll_id IS NULL) AS unused FROM images;
+  ```
 - **Not planned in any milestone yet:**
   - rate limits and sybil resistance (see Review, P1);
   - report reasons and a moderator page;
@@ -699,8 +710,8 @@ SELECT account_id, count(*) FROM payments GROUP BY account_id HAVING count(*) > 
   - account recovery or merging across devices, now including Pro. The buyer's email is stored, so a "restore Pro by email" link is the natural next step;
   - subscriptions, per-poll pricing, coupons and automatic refund handling (a `charge.refunded` webhook);
   - creator controls (close or delete a poll);
-  - image upload (options take links only);
-  - browser end-to-end tests;
+  - ~~image upload (options take links only)~~: built (growth, 2026-10-19, see GROWTH.md). Not in it: uploading from the native app, and shrinking photos in the browser before upload;
+  - browser end-to-end tests (one now covers photo upload: `tests/photo-upload-browser.test.ts`);
   - a CI workflow.
 - **Product checks to watch.** These come from REVIEW.md Q5 and the PRD's metrics.
   - **From M1:**

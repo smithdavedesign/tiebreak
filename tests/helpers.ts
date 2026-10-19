@@ -6,6 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import { fromPglite, setDb } from '@/lib/db'
 import { GET as accountRoute } from '@/app/account/route'
 import { POST as checkoutRoute } from '@/app/checkout/route'
+import { POST as uploadRoute } from '@/app/images/route'
+import { GET as imageRoute } from '@/app/images/[id]/route'
 import { GET as feedRoute, POST as createPollRoute } from '@/app/polls/route'
 import { GET as exportRoute } from '@/app/polls/[id]/export/route'
 import { GET as getPollRoute } from '@/app/polls/[id]/route'
@@ -24,7 +26,7 @@ export function useTestDb() {
     await setDb(fromPglite(pg))
   })
   beforeEach(async () => {
-    await pg.query('TRUNCATE payments, reports, votes, polls')
+    await pg.query('TRUNCATE payments, reports, votes, images, polls')
   })
   afterAll(async () => {
     await pg.close()
@@ -127,6 +129,29 @@ export async function rawVote(id: string, init: RequestInit) {
 
 export async function rawCreate(init: RequestInit) {
   return createPollRoute(new Request(`${ORIGIN}/polls`, { method: 'POST', ...init }))
+}
+
+// ── Photo upload ───────────────────────────────────────────────────────────
+
+/** POST /images: uploads a photo's bytes as the browser sends a picked file. */
+export async function uploadImage(bytes: Uint8Array | null, type: string | null, cookie?: string) {
+  const headers: Record<string, string> = {}
+  if (type !== null) headers['content-type'] = type
+  if (cookie) headers.cookie = cookie
+  const body = bytes === null ? null : new Uint8Array(bytes)
+  const res = await uploadRoute(new Request(`${ORIGIN}/images`, { method: 'POST', headers, body }))
+  return { res, body: await res.json() }
+}
+
+export async function rawUpload(init: RequestInit) {
+  return uploadRoute(new Request(`${ORIGIN}/images`, { method: 'POST', ...init }))
+}
+
+/** GET /images/:id (or the path of a full image URL). */
+export async function getImage(idOrUrl: string) {
+  const id = idOrUrl.split('/').pop() ?? ''
+  const res = await imageRoute(getRequest(`/images/${id}`), ctx(id))
+  return { res, bytes: new Uint8Array(await res.arrayBuffer()) }
 }
 
 /** The M1 exit-criteria poll: 2 options, target 3, 24h. */

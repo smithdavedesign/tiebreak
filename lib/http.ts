@@ -77,6 +77,33 @@ export function jsonError(status: number, error: string) {
   return Response.json({ error }, { status })
 }
 
+/** A request's media type, lower-cased and without parameters (`; charset=…`), or undefined. */
+export const mediaTypeOf = (request: Request) =>
+  request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
+
+/**
+ * A request body's bytes, or null once it passes `maxBytes`: a declared length over
+ * the cap is refused unread, and a streamed body stops being read at the cap.
+ */
+export async function readCapped(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+  if (Number(request.headers.get('content-length') ?? 0) > maxBytes) return null
+  if (!request.body) return new Uint8Array(0)
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {})
+      return null
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks)
+}
+
 /**
  * Parses a JSON request body. Only `application/json` is accepted: a
  * cross-site HTML form can't send it without a CORS preflight, which this
@@ -86,8 +113,7 @@ export function jsonError(status: number, error: string) {
 export async function readJson(
   request: Request,
 ): Promise<{ ok: true; value: unknown } | { ok: false; response: Response }> {
-  const type = request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
-  if (type !== 'application/json') {
+  if (mediaTypeOf(request) !== 'application/json') {
     return { ok: false, response: jsonError(415, 'Send the body as application/json') }
   }
   try {

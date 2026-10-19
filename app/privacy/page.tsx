@@ -24,7 +24,12 @@ export default function PrivacyPage() {
 
       <h2>What we store</h2>
       <ul>
-        <li>Polls you create: the question, the options (text and image links) and when they close.</li>
+        <li>Polls you create: the question, the options (text, image links and photos) and when they close.</li>
+        <li>
+          Photos you upload for an option, kept in our database. We remove location, camera and other hidden details from
+          the file first. Anyone with the poll&apos;s link sees them (and the public feed, if you post it there). A photo
+          no poll uses is deleted after a day, and deleting a poll deletes its photos.
+        </li>
         <li>Your votes and reports, with the time. Creators can download the votes on their own polls (time and option, never who voted).</li>
         <li>
           If you buy Pro: Stripe handles your card and we never see it. Stripe tells us your email, the amount and the
@@ -54,8 +59,9 @@ export default function PrivacyPage() {
 
       <h2>Who else sees anything</h2>
       <p>
-        Stripe, if you pay. Our hosts, Vercel (the website) and Neon (the database), run the service. Option images load
-        straight from the links poll creators give, so those sites see the request. Nothing is sold or shared for ads.
+        Stripe, if you pay. Our hosts, Vercel (the website) and Neon (the database), run the service. Uploaded photos load
+        from tiebreak itself. Option images given as links load straight from those links, so those sites see the
+        request. Nothing is sold or shared for ads.
       </p>
 
       <h2>Contact</h2>

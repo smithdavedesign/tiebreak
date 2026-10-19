@@ -62,12 +62,27 @@ const SCHEMA = [
     paid_at      timestamptz NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS payments_account_idx ON payments (account_id)`,
+  // Photo upload: photos uploaded as poll options, cleaned and stored here
+  // (lib/images.ts). poll_id is set when a poll uses the photo, which is when it
+  // starts being served; deleting the poll deletes it. Unused ones go after a day.
+  // uploader_id is the uploading account, kept for abuse reports.
+  `CREATE TABLE IF NOT EXISTS images (
+    id           text PRIMARY KEY,
+    content_type text NOT NULL CHECK (content_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    data         bytea NOT NULL,
+    bytes        integer NOT NULL CHECK (bytes > 0),
+    uploader_id  text NOT NULL,
+    poll_id      text REFERENCES polls (id) ON DELETE CASCADE,
+    created_at   timestamptz NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS images_poll_idx ON images (poll_id)`,
+  `CREATE INDEX IF NOT EXISTS images_unused_idx ON images (created_at) WHERE poll_id IS NULL`,
 ]
 
 // Created by the last SCHEMA statement. The DDL runs in one transaction, so if
 // it exists the whole schema does. When you add DDL, put it last and point this
 // at the object it creates (a table or index: to_regclass can't see constraints).
-const SCHEMA_SENTINEL = 'payments_account_idx'
+const SCHEMA_SENTINEL = 'images_unused_idx'
 
 // Arbitrary constant: serialises DDL when several cold starts race.
 const SCHEMA_LOCK_KEY = 7_204_311

@@ -1,7 +1,8 @@
-// npm run screenshots: starts the app, drives the main job (post a poll, collect
-// votes, read the result) with Playwright at desktop and phone size, then shows
-// one of the search pages (/which-etsy-photo-is-best); saves PNGs to
-// docs/screenshots/ and stops the app. Not part of `npm test`.
+// npm run screenshots: starts the app, drives the main job with Playwright at
+// desktop and phone size (pick a photo for each option, post the poll, see both
+// photos on the voting card, collect votes, read the result), saves PNGs to
+// docs/screenshots/ and stops the app. Not part of `npm test`. The sample photos
+// are drawn in the browser (two mugs), so no real photo is used.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -22,7 +23,7 @@ const QUESTION = 'Which photo for my ceramic mug listing?'
 const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
-const SHOTS = ['home', 'result', 'guide']
+const SHOTS = ['home', 'poll', 'result']
 const SIZES = ['desktop', 'mobile']
 
 if (!process.env.CHROMIUM_PATH) {
@@ -76,49 +77,155 @@ async function strangerVotes(id, option) {
   if (res.status !== 201) throw new Error(`Stranger vote failed: ${res.status}`)
 }
 
+/**
+ * Two sample product photos, drawn on a canvas in the page and encoded as JPEG the
+ * way a phone's photo would arrive: a speckled blue mug in morning light, and a
+ * matte white mug on a walnut shelf.
+ */
+async function samplePhotos(page) {
+  const encoded = await page.evaluate(async () => {
+    const draw = (scene) => {
+      const size = 900
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      const wall = ctx.createLinearGradient(0, 0, size, size)
+      wall.addColorStop(0, scene.wall[0])
+      wall.addColorStop(1, scene.wall[1])
+      ctx.fillStyle = wall
+      ctx.fillRect(0, 0, size, size)
+      // The surface the mug stands on.
+      ctx.fillStyle = scene.surface
+      ctx.fillRect(0, 640, size, 260)
+      if (scene.grain) {
+        ctx.strokeStyle = 'rgba(30, 15, 5, 0.35)'
+        ctx.lineWidth = 3
+        for (let y = 660; y < size; y += 26) {
+          ctx.beginPath()
+          ctx.moveTo(0, y)
+          ctx.bezierCurveTo(300, y - 12, 600, y + 14, size, y - 4)
+          ctx.stroke()
+        }
+      }
+      // Shadow, handle, body and rim.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)'
+      ctx.beginPath()
+      ctx.ellipse(470, 668, 250, 34, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.lineWidth = 46
+      ctx.strokeStyle = scene.mug[1]
+      ctx.beginPath()
+      ctx.ellipse(630, 450, 95, 120, 0, -Math.PI / 2, Math.PI / 2)
+      ctx.stroke()
+      const body = ctx.createLinearGradient(250, 0, 640, 0)
+      body.addColorStop(0, scene.mug[1])
+      body.addColorStop(0.45, scene.mug[0])
+      body.addColorStop(1, scene.mug[1])
+      ctx.fillStyle = body
+      ctx.beginPath()
+      ctx.moveTo(250, 290)
+      ctx.lineTo(250, 610)
+      ctx.quadraticCurveTo(250, 665, 310, 665)
+      ctx.lineTo(580, 665)
+      ctx.quadraticCurveTo(640, 665, 640, 610)
+      ctx.lineTo(640, 290)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = scene.rim
+      ctx.beginPath()
+      ctx.ellipse(445, 290, 195, 38, 0, 0, Math.PI * 2)
+      ctx.fill()
+      if (scene.speckles) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
+        for (let i = 0; i < 260; i++) {
+          const x = 262 + ((i * 97) % 366)
+          const y = 330 + ((i * 53) % 320)
+          ctx.beginPath()
+          ctx.arc(x, y, 2 + (i % 4), 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+      return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88))
+    }
+    const toBase64 = async (blob) => {
+      let binary = ''
+      for (const byte of new Uint8Array(await blob.arrayBuffer())) binary += String.fromCharCode(byte)
+      return btoa(binary)
+    }
+    const blue = await draw({
+      wall: ['#fff3dc', '#f4d9b0'],
+      surface: '#efe6da',
+      mug: ['#4f86d9', '#1f4f9e'],
+      rim: '#183f80',
+      speckles: true,
+    })
+    const white = await draw({
+      wall: ['#e7e3dc', '#cfc8bd'],
+      surface: '#6b4325',
+      grain: true,
+      mug: ['#fbfaf7', '#d9d5cd'],
+      rim: '#c9c4ba',
+    })
+    return { a: await toBase64(blue), b: await toBase64(white) }
+  })
+  return { a: Buffer.from(encoded.a, 'base64'), b: Buffer.from(encoded.b, 'base64') }
+}
+
+const allLoaded = (images) => images.evaluateAll((els) => els.every((el) => el.complete && el.naturalWidth > 0))
+
 async function run(browser, label, contextOptions) {
   const context = await browser.newContext(contextOptions)
   const page = await context.newPage()
-  // Viewport only, from the top of the page (or its bottom, to show the footer),
-  // without the Next dev-mode badge.
-  const shot = async (name, { bottom = false } = {}) => {
+  // Viewport only, from the top of the page (or from an element), without the Next dev-mode badge.
+  const shot = async (name, { from } = {}) => {
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
-    await page.evaluate((toBottom) => {
-      document.activeElement?.blur()
-      window.scrollTo(0, toBottom ? document.documentElement.scrollHeight : 0)
-    }, bottom)
+    await page.evaluate(() => document.activeElement?.blur())
+    if (from) await from.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+    else await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${outDir}${name}-${label}.png` })
   }
+  const waitForImages = async (selector) => {
+    const images = page.locator(selector)
+    for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
+  }
 
-  // 1. The start page with a poll filled in.
+  // 1. The start page with a poll filled in and a photo picked for each option:
+  // the thumbnails show before anything is uploaded.
   await page.goto(base)
   await page.getByLabel('Option A text').waitFor()
   await page.getByLabel('Question').fill(QUESTION)
   await page.getByLabel('Option A text').fill(OPTION_A)
   await page.getByLabel('Option B text').fill(OPTION_B)
   await page.getByLabel('Close at').fill(String(TARGET))
-  await shot('home')
+  const photos = await samplePhotos(page)
+  await page.getByLabel('Option A photo').setInputFiles({ name: 'speckled-blue-mug.jpg', mimeType: 'image/jpeg', buffer: photos.a })
+  await page.getByLabel('Option B photo').setInputFiles({ name: 'white-mug-walnut.jpg', mimeType: 'image/jpeg', buffer: photos.b })
+  await page.locator('img.thumb').nth(1).waitFor()
+  await waitForImages('img.thumb')
+  // On a phone the options sit below the intro, so the shot starts at the form.
+  await shot('home', label === 'mobile' ? { from: page.locator('form') } : {})
 
-  // 2. Post it (the core action); two strangers vote; the creator swipes the
-  // last vote on the card, which closes the poll and shows its winner.
+  // 2. Post it (the core action): the photos upload, and the poll page shows both
+  // on the swipe card, served by tiebreak.
   await page.getByRole('button', { name: 'Create poll' }).click()
   await page.waitForURL(/\/p\/[^/?]+/)
   await page.getByText('Your poll is live').waitFor()
+  await waitForImages('.swipe-card img')
+  await shot('poll')
+
+  // 3. Two strangers vote; the creator swipes the last vote on the card, which
+  // closes the poll and shows its winner with the split.
   const id = new URL(page.url()).pathname.split('/').pop()
-  await strangerVotes(id, 1)
   await strangerVotes(id, 0)
+  await strangerVotes(id, 1)
   await page.goto(`${base}/p/${id}`)
   await page.getByText(`2 of ${TARGET} votes`).waitFor()
   await page.getByRole('button', { name: 'Pick A' }).click()
   await page.getByText(/^Winner:/).waitFor()
   await page.getByText(`Closed with ${TARGET} votes`).waitFor()
+  await waitForImages('.result img')
   await shot('result')
-
-  // 3. A search page: the Etsy photo guide, which ends in a link back to post a poll.
-  await page.goto(`${base}/which-etsy-photo-is-best`)
-  await page.getByRole('heading', { name: 'Which Etsy listing photo is best?' }).waitFor()
-  await page.getByRole('link', { name: 'Post your poll' }).waitFor()
-  await shot('guide')
 
   await context.close()
 }

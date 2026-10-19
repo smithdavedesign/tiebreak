@@ -18,7 +18,8 @@ export default async function HomePage() {
     <>
       <h1>Can&apos;t choose? Let them swipe.</h1>
       <p className="lede">
-        Add 2–4 options, pick how many votes you need and how long to wait, then share the link.
+        Add 2–4 options (text, or photos straight from your phone), pick how many votes you need and how long
+        to wait, then share the link.
         The poll closes at the vote target or the deadline, whichever comes first.
       </p>
       <p className="hint">

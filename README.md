@@ -2,22 +2,22 @@
 
 ## Screenshots
 
-![Start page with a poll filled in, desktop](docs/screenshots/home-desktop.png)
-![Start page with a poll filled in, phone](docs/screenshots/home-mobile.png)
+![Start page with a photo picked for each option, thumbnails showing, desktop](docs/screenshots/home-desktop.png)
+![Start page with a photo picked for each option, thumbnails showing, phone](docs/screenshots/home-mobile.png)
 
-The core action, posting a poll: a question, two options and a vote target, no sign-up.
+The core action, posting a poll, now with photos: each option has "Upload a photo" (JPEG, PNG or WebP, up to 5 MB), and the picked photo shows as a thumbnail in its option before anything is sent.
 
-![Closed poll with the winner and vote split, desktop](docs/screenshots/result-desktop.png)
-![Closed poll with the winner and vote split, phone](docs/screenshots/result-mobile.png)
+![The new poll's swipe card with both uploaded photos, desktop](docs/screenshots/poll-desktop.png)
+![The new poll's swipe card with both uploaded photos, phone](docs/screenshots/poll-mobile.png)
 
-Its result: two strangers voted on the shared link, the creator swiped the third vote, and the poll closed with the winner and the split (2 to 1).
+The poll it posted: both photos were uploaded with the poll and now load from tiebreak itself, on the card people swipe.
 
-![Search page "Which Etsy listing photo is best?", desktop](docs/screenshots/guide-desktop.png)
-![Search page "Which Etsy listing photo is best?", phone](docs/screenshots/guide-mobile.png)
+![Closed poll with the winning photo and the vote split, desktop](docs/screenshots/result-desktop.png)
+![Closed poll with the winning photo and the vote split, phone](docs/screenshots/result-mobile.png)
 
-One of the three public search pages (a PickFu alternative, which Etsy photo is best, a thumbnail or book cover): a useful answer to what a buyer searches, ending in a link to post a poll. All three are in the sitemap and linked from the footer (seen under the result above) and the home page.
+Its result: two strangers voted on the shared link, the creator swiped the third vote, and the poll closed with the winning photo and the split (2 to 1).
 
-Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only).
+Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two mug photos are drawn in the browser).
 
 People post two options, strangers swipe to pick one, and the poll closes at a vote target or deadline; sellers and creators pay a few dollars for a fast verdict instead of PickFu's $15+.
 

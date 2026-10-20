@@ -49,7 +49,8 @@ export default function PrivacyPage() {
       <p>
         Our own counter (RepoHQ) gets three anonymous events: a &ldquo;visit&rdquo; (the first page you open in a browser
         session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
-        (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
+        (when you click the button to buy Pro). Each carries only the page of this site it was sent from (a poll&apos;s page
+        is sent as &ldquo;a poll page&rdquo;, never its link) and the page that linked you here, if it was another site and
         your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
         with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
         automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting

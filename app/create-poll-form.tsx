@@ -16,7 +16,9 @@ import {
   MIN_TARGET,
   OPTION_LETTERS as LETTERS,
 } from '@/lib/limits'
+import { uploadPhoto } from '@/lib/photo-upload'
 import type { Plan } from '@/lib/plans'
+import { clearPollDraft, peekPollDraft, type PollDraft } from '@/lib/poll-draft'
 
 const DURATIONS = [
   { hours: 1, label: '1 hour' },
@@ -43,18 +45,21 @@ type Draft = {
 }
 const blank = (): Draft => ({ text: '', imageUrl: '', photo: null, uploaded: null, photoError: null })
 
-/** The message for a refused upload: the server's own, else one for the status. */
-function uploadError(status: number, body: { error?: unknown } | null) {
-  if (typeof body?.error === 'string') return body.error
-  // Vercel refuses a request body over 4.5 MB itself, before the app sees it.
-  if (status === 413) return 'That photo is too big to upload. Try a smaller copy of it.'
-  return "The photo didn't upload. Try again."
+/** The options the form opens with: two blank ones, or a thumbnail tool's images (already uploaded) as A, B, … */
+function openingOptions(draft: PollDraft | null): Draft[] {
+  const options = (draft?.photos ?? []).slice(0, MAX_OPTIONS).map((p): Draft => ({ ...blank(), photo: p.file, uploaded: p.url }))
+  while (options.length < MIN_OPTIONS) options.push(blank())
+  return options
 }
 
 export function CreatePollForm({ account, plan }: { account: AccountView; plan: Plan }) {
   const router = useRouter()
-  const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState<Draft[]>([blank(), blank()])
+  // A thumbnail tool's "Let strangers pick" opens this form with its images (lib/poll-draft.ts), once.
+  const [draft] = useState(peekPollDraft)
+  useEffect(() => clearPollDraft(), [])
+  const [question, setQuestion] = useState(draft?.question ?? '')
+  const [options, setOptions] = useState<Draft[]>(() => openingOptions(draft))
+  const fromTool = draft ? Math.min(draft.photos.length, MAX_OPTIONS) : 0
   const [target, setTarget] = useState(String(DEFAULT_TARGET))
   const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [isPublic, setIsPublic] = useState(false)
@@ -76,17 +81,12 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
       options.map(async (o, i): Promise<string | null | false> => {
         if (!o.photo) return null
         if (o.uploaded) return o.uploaded
-        const res = await fetch('/images', {
-          method: 'POST',
-          headers: { 'content-type': o.photo.type || 'application/octet-stream' },
-          body: o.photo,
-        })
-        const body = await res.json().catch(() => null)
-        if (res.status === 201 && typeof body?.url === 'string') {
-          update(i, { uploaded: body.url })
-          return body.url
+        const result = await uploadPhoto(o.photo)
+        if ('url' in result) {
+          update(i, { uploaded: result.url })
+          return result.url
         }
-        update(i, { photoError: uploadError(res.status, body) })
+        update(i, { photoError: result.error })
         return false
       }),
     )
@@ -135,6 +135,14 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
 
   return (
     <form className="card create" onSubmit={submit}>
+      {fromTool > 0 && (
+        <p className="notice" role="status">
+          {fromTool === 1
+            ? 'Your image from the preview is option A, already uploaded.'
+            : `Your ${fromTool} images from the preview are options A–${LETTERS[fromTool - 1]}, already uploaded.`}{' '}
+          Edit the question or add text if you like, then create the poll.
+        </p>
+      )}
       <label>
         Question <span className="hint">(optional)</span>
         <input

@@ -23,6 +23,9 @@ export const PUBLIC_PAGES = [
   '/pickfu-alternative',
   '/which-etsy-photo-is-best',
   '/choose-a-thumbnail-or-book-cover',
+  '/tools/etsy-thumbnail-preview',
+  '/tools/book-cover-thumbnail-test',
+  '/tools/youtube-thumbnail-preview',
 ] as const
 
 /** RepoHQ's visit counter for idea products (anonymous: no cookies, an hourly-limited IP hash). */

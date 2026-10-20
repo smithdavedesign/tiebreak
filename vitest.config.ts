@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // One dev server for every browser test file (only with CHROMIUM_PATH): Next allows one per directory.
+    globalSetup: ['tests/dev-server.ts'],
     // Feeds start empty; tests/house.test.ts turns house polls on where it needs them.
     env: { HOUSE_POLLS: 'off' },
     // PGlite boots a WASM Postgres per test file.

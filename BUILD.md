@@ -499,6 +499,8 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - Pro accounts get a second checkbox, "Keep the result private: only you see the winner and the split (Pro)". Ticking it turns the public box off.
     - Free accounts see "Want the result kept private, or every vote in a spreadsheet? Get Pro" instead.
   - Creating a poll takes you to its share page.
+  - **New (growth, 2026-10-20):** opened from a thumbnail tool's "Let strangers pick", the form starts with that tool's question and its 2–4 images (already uploaded) as options A, B, …, with a note saying so. Posting doesn't upload them again. The hand-off is in memory (`lib/poll-draft.ts`), so a reload starts a blank form.
+- **`/tools/etsy-thumbnail-preview`, `/tools/book-cover-thumbnail-test`, `/tools/youtube-thumbnail-preview`** (growth, 2026-10-20): free search-landing tools. Add 2–4 images from the device (JPEG, PNG or WebP) and see them side by side, drawn in the browser with nothing sent: Etsy in a mock search grid at the 1:1, 4:3 and 5:4 crops; book covers about 160 px and 80 px tall; YouTube at 16:9 in a desktop grid and a phone feed. "Let strangers pick" uploads them (`POST /images`) and opens the new-poll form on `/`. Linked from the footer; listed in the sitemap.
 - **`/pro`** (new in M3): the paid tier.
   - It lists what Pro adds: private polls and CSV export.
   - It shows the price as Stripe reports it, e.g. "$9.00, paid once. No subscription." If Stripe can't be reached, it says "price shown at checkout".
@@ -711,7 +713,7 @@ SELECT account_id, count(*) FROM payments GROUP BY account_id HAVING count(*) > 
   - subscriptions, per-poll pricing, coupons and automatic refund handling (a `charge.refunded` webhook);
   - creator controls (close or delete a poll);
   - ~~image upload (options take links only)~~: built (growth, 2026-10-19, see GROWTH.md). Not in it: uploading from the native app, and shrinking photos in the browser before upload;
-  - browser end-to-end tests (one now covers photo upload: `tests/photo-upload-browser.test.ts`);
+  - browser end-to-end tests (two now: photo upload, `tests/photo-upload-browser.test.ts`, and the thumbnail tools, `tests/thumbnail-tools-browser.test.ts`; they share one dev server, `tests/dev-server.ts`, because Next 16 runs one per directory);
   - a CI workflow.
 - **Product checks to watch.** These come from REVIEW.md Q5 and the PRD's metrics.
   - **From M1:**

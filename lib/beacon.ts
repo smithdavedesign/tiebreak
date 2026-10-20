@@ -1,4 +1,4 @@
-import { SIGNAL_URL } from '@/lib/site'
+import { PUBLIC_PAGES, SIGNAL_URL } from '@/lib/site'
 
 /** The three funnel events tiebreak sends to RepoHQ (named on the privacy page). */
 export type SignalKind = 'visit' | 'activate' | 'checkout'
@@ -32,10 +32,20 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
 }
 
 /**
- * Fire-and-forget funnel event. visit: once per browser session (sessionStorage); activate: once per
- * browser (localStorage); checkout: every Buy click. No cookies. Sent as text/plain so the browser needs
- * no CORS preflight; the endpoint parses the JSON body. If storage is unavailable, nothing is sent
- * rather than repeating a once-only event.
+ * The page an event is sent from, so visitors can be counted by the page they landed on (the tool pages
+ * apart from the search pages, say). Public pages go as themselves. A poll's page goes as "/p/[id]",
+ * never with its id, since an unlisted poll's link is its creator's to share. Anything else is null.
+ */
+export function pagePath(pathname: string): string | null {
+  if ((PUBLIC_PAGES as readonly string[]).includes(pathname)) return pathname
+  return /^\/p\/[^/]+$/.test(pathname) ? '/p/[id]' : null
+}
+
+/**
+ * Fire-and-forget funnel event. visit: once per browser session (sessionStorage), so its path is the page
+ * the visitor landed on; activate: once per browser (localStorage); checkout: every Buy click. No cookies.
+ * Sent as text/plain so the browser needs no CORS preflight; the endpoint parses the JSON body. If storage
+ * is unavailable, nothing is sent rather than repeating a once-only event.
  */
 export function sendSignal(kind: SignalKind): void {
   try {
@@ -48,7 +58,12 @@ export function sendSignal(kind: SignalKind): void {
       if (localStorage.getItem(ACTIVATED_KEY)) return
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer: referrerFor(document.referrer, location.origin) })
+    const body = JSON.stringify({
+      slug: 'tiebreak',
+      kind,
+      referrer: referrerFor(document.referrer, location.origin),
+      path: pagePath(location.pathname),
+    })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

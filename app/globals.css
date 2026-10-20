@@ -470,3 +470,230 @@ button.danger {
 .guide-cta p {
   margin: 0;
 }
+
+/* Thumbnail tools (/tools/…): a wider page for side-by-side previews, the mock placements and the poll button */
+main:has(> .tool-page) {
+  max-width: 64rem;
+}
+
+.tool-page > :not(.tool) {
+  max-width: 40rem;
+}
+
+.tool {
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.photo-pick:has(input:disabled) .pick {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.picks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.picks li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+}
+
+.picks .error {
+  flex-basis: 100%;
+}
+
+.picks b,
+.mock figcaption b {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+.tool-empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  border: 2px dashed var(--line);
+  border-radius: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.previews {
+  display: grid;
+  gap: 1.2rem;
+  min-width: 0;
+}
+
+.mock {
+  min-width: 0;
+}
+
+.mock h2 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.mock figure {
+  margin: 0;
+}
+
+.mock figcaption {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.tile {
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--bg);
+}
+
+.tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.crop-1x1 {
+  aspect-ratio: 1 / 1;
+}
+
+.crop-4x3 {
+  aspect-ratio: 4 / 3;
+}
+
+.crop-5x4 {
+  aspect-ratio: 5 / 4;
+}
+
+.crop-16x9 {
+  aspect-ratio: 16 / 9;
+}
+
+/* Grey bars where a listing's or video's text would be */
+.text-bars {
+  flex: 1;
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.25rem;
+}
+
+.text-bar {
+  display: block;
+  height: 0.5rem;
+  border-radius: 1rem;
+  background: var(--line);
+}
+
+.text-bar.short {
+  width: 40%;
+}
+
+/* Etsy: a search grid, four listings across on a computer and two on a phone */
+.listing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+@media (max-width: 40rem) {
+  .listing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+}
+
+/* Book covers: one row per size, each cover at a fixed height in its own shape; a long row scrolls */
+.cover-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+
+.mock figure.cover {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.mock figure.cover figcaption {
+  justify-content: center;
+}
+
+.cover-row img {
+  display: block;
+  width: auto;
+  border-radius: 0.2rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.cover-160 {
+  height: 160px;
+}
+
+.cover-80 {
+  height: 80px;
+}
+
+/* YouTube: a desktop grid (side by side) and a phone feed (one column, phone width) */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(16rem, 40%), 1fr));
+  gap: 1rem 0.9rem;
+}
+
+.phone-feed {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 22rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: var(--bg);
+}
+
+.avatar {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.tool-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.tool-cta p {
+  margin: 0;
+}
+
+/* The new-poll form, opened from a tool: its note sits at the top like the fields */
+.create > .notice {
+  margin: 0;
+}

@@ -55,7 +55,7 @@ describe('sendSignal', () => {
     vi.stubGlobal('localStorage', local)
     vi.stubGlobal('sessionStorage', memoryStorage())
     vi.stubGlobal('navigator', nav)
-    vi.stubGlobal('location', { origin: 'https://tiebreak-phi.vercel.app' })
+    vi.stubGlobal('location', { origin: 'https://tiebreak-phi.vercel.app', pathname: '/' })
     vi.stubGlobal('document', { referrer: 'https://news.ycombinator.com/' })
   })
   afterEach(() => {
@@ -69,12 +69,12 @@ describe('sendSignal', () => {
       return { url, init, body: JSON.parse(init.body as string) }
     })
 
-  it('posts {slug, kind, referrer} to the RepoHQ signal endpoint with keepalive and no credentials', () => {
+  it('posts {slug, kind, referrer, path} to the RepoHQ signal endpoint with keepalive and no credentials', () => {
     sendSignal('visit')
     const [call] = sent()
     expect(call.url).toBe(SIGNAL_URL)
     expect(call.init).toMatchObject({ method: 'POST', keepalive: true, credentials: 'omit' })
-    expect(call.body).toEqual({ slug: 'tiebreak', kind: 'visit', referrer: 'https://news.ycombinator.com/' })
+    expect(call.body).toEqual({ slug: 'tiebreak', kind: 'visit', referrer: 'https://news.ycombinator.com/', path: '/' })
   })
   it('sends a null referrer when the visitor came from the same site', () => {
     vi.stubGlobal('document', { referrer: 'https://tiebreak-phi.vercel.app/pro' })

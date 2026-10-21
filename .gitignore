@@ -8,3 +8,5 @@ next-env.d.ts
 .vercel/
 .env*
 .DS_Store
+# Local scratch checks (sample data only)
+.scratch/

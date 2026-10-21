@@ -29,10 +29,15 @@ const terms = await import('@/app/terms/page')
 const pickfu = await import('@/app/pickfu-alternative/page')
 const etsy = await import('@/app/which-etsy-photo-is-best/page')
 const thumbnail = await import('@/app/choose-a-thumbnail-or-book-cover/page')
+const tool = await import('@/app/tools/[tool]/page')
 
 useTestDb()
 
 const noQuery = { searchParams: Promise.resolve({}) }
+const toolEntry = async (slug: string) => {
+  const params = { params: Promise.resolve({ tool: slug }) }
+  return { metadata: await tool.generateMetadata(params), render: () => tool.default(params) }
+}
 const PAGES: Record<(typeof PUBLIC_PAGES)[number], { metadata: Metadata; render: () => ReactElement | Promise<ReactElement> }> = {
   '/': { metadata: home.metadata, render: () => home.default() },
   '/feed': { metadata: feed.metadata, render: () => feed.default() },
@@ -42,6 +47,9 @@ const PAGES: Record<(typeof PUBLIC_PAGES)[number], { metadata: Metadata; render:
   '/pickfu-alternative': { metadata: pickfu.metadata, render: () => pickfu.default() },
   '/which-etsy-photo-is-best': { metadata: etsy.metadata, render: () => etsy.default() },
   '/choose-a-thumbnail-or-book-cover': { metadata: thumbnail.metadata, render: () => thumbnail.default() },
+  '/tools/etsy-thumbnail-preview': await toolEntry('etsy-thumbnail-preview'),
+  '/tools/book-cover-thumbnail-test': await toolEntry('book-cover-thumbnail-test'),
+  '/tools/youtube-thumbnail-preview': await toolEntry('youtube-thumbnail-preview'),
 }
 const entries = Object.entries(PAGES)
 

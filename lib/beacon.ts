@@ -32,9 +32,9 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
 }
 
 /**
- * Fire-and-forget funnel event. visit: once per browser session (sessionStorage); activate: once per
- * browser (localStorage); checkout: every Buy click. No cookies. Sent as text/plain so the browser needs
- * no CORS preflight; the endpoint parses the JSON body. If storage is unavailable, nothing is sent
+ * Fire-and-forget funnel event. visit: once per browser session (sessionStorage), with the path of the page
+ * it was counted on; activate: once per browser (localStorage); checkout: every Buy click. No cookies. Sent
+ * as text/plain so the browser needs no CORS preflight; the endpoint parses the JSON body. If storage is unavailable, nothing is sent
  * rather than repeating a once-only event.
  */
 export function sendSignal(kind: SignalKind): void {
@@ -48,7 +48,14 @@ export function sendSignal(kind: SignalKind): void {
       if (localStorage.getItem(ACTIVATED_KEY)) return
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer: referrerFor(document.referrer, location.origin) })
+    const body = JSON.stringify({
+      slug: 'tiebreak',
+      kind,
+      referrer: referrerFor(document.referrer, location.origin),
+      // A visit names the page it was counted on, so landings on the preview tools and on the search pages
+      // can be told apart. The path only: a query can carry photo ids (the new-poll form's hand-off).
+      ...(kind === 'visit' ? { path: location.pathname } : {}),
+    })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

@@ -98,3 +98,58 @@ SELECT count(*) AS polls, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM images i 
   FROM polls p WHERE p.created_at >= '<merge date>' AND p.creator_id IS DISTINCT FROM 'house';
 ```
 (`'house'` is `HOUSE_ID` in `lib/house.ts`, the starter polls' creator, left out.) At under 50 visitors a week, a 10% rate is a handful of polls, so read the counts, not just the percentage.
+
+## 2026-10-21: free thumbnail preview tools
+
+**Mission:** a free side-by-side thumbnail preview tool for Etsy listing photos, book covers and YouTube thumbnails. Buyers search for free thumbnail-preview tools, and the ones out there show one image at a time with no vote. tiebreak's previews 2–4 candidates side by side and hands them to a poll in one click.
+
+**Hypothesis:** a search-landing tool (something people use, not an article) brings visitors from searches like "Etsy thumbnail preview", "book cover thumbnail test" and "YouTube thumbnail preview", and some of them take the one-click step to a poll. It's a different kind of page from the three search pages in the running SEO experiment, and its visits are counted apart from theirs.
+
+**Decisions** (nobody to ask, so decided here)
+- **One route, three tools.** `app/tools/[tool]` with the three slugs from `lib/tools.ts` (`generateStaticParams`, `dynamicParams = false`): each page is prerendered as static HTML with its own title, description, canonical URL and h1, and any other `/tools/<slug>` is a 404. A registry instead of three near-identical page files.
+- **What each tool shows, from the mission.** Etsy: every image at the 1:1, 4:3 and 5:4 crops, in a search-grid mock (3 images → 9 tiles). Book covers: every cover whole at about 160 px and about 80 px tall, in a row. YouTube: every image at 16:9 in a desktop-grid tile and in a phone-feed tile. Tiles are lettered A–D like the poll's options.
+- **Honest copy.** The page says the mocks are simplified (size and crop, not any site's exact layout) and that tiebreak isn't affiliated with Etsy, YouTube or any store. No claim about a platform's exact thumbnail sizes, no numbers, quotes or user counts. The Etsy lede uses the forum's own words ("which picture is best?", RESEARCH.md). The "what to look for" bullets restate the existing search pages' checklists.
+- **Nothing leaves the device until the button.** Previews are object URLs of the picked files. The picker is disabled until the page is interactive, so a file picked during loading isn't silently dropped. A poll takes 2–4 options, so a fifth image is left out with a note, and the button needs two.
+- **"Let strangers pick" uses the existing upload.** It sends each image to `POST /images` (all at once, with that endpoint's 5 MB limit, byte check, metadata clean-up and storage cap). A refused image says why in its own slot and nothing opens; images already stored aren't sent again on the retry.
+- **The hand-off is a URL plus memory.** The tool opens `/?tool=<slug>&photo=<id>…`. The home page keeps only well-formed photo ids, each once, at most four, and the form starts with them as options A–D and the tool's question ("Which listing photo should I use?" and so on). The thumbnails come from the same files, handed over in memory (`lib/photo-handoff.ts`), because an upload isn't served until a poll uses it (that rule keeps tiebreak from being a free anonymous image host). After a reload the option says "Uploaded photo" instead of drawing it, and posting still works.
+- **The poll is the form's usual one:** link-only by default, so it's free; posting to the public feed still costs a credit. The button label is the mission's; the hint under it says you share the link and people swipe.
+- **The visit beacon now carries the page's path** (`path`, e.g. `/tools/etsy-thumbnail-preview`) on `visit` events. It's the path only, never the query string, because the form's query carries photo ids. A visit is still sent once per browser session, so it's credited to the page the session started on, which for a search-landing page is the one that matters. `activate` and `checkout` are unchanged. The privacy page says so.
+- **The footer links the three tools** on every page, so crawlers reach them by links as well as through the sitemap. The search pages themselves are unchanged.
+- **Test infrastructure:** Next 16 allows one `next dev` per project directory (`.next/dev/lock`), and both browser test files start one. `vitest.config.ts` now has two projects, `unit` and `browser`, and runs browser files one at a time (checked: run in parallel, the second dev server exits). With Chromium the full suite now takes 50–85 s here (it was about 40 s). CI has no `CHROMIUM_PATH`, so it skips both browser files as before.
+- **No new dependency, service, key or `.provision` line.** Checkout, Stripe, prices and the Buy button are untouched.
+- **Housekeeping:** a scratch folder from a visual check (`.scratch/`, sample images and a script) couldn't be deleted in this sandbox, so `.gitignore` now lists it. Delete it freely.
+
+**What changed**
+- `lib/tools.ts` (new): the three tools (name, title, description, copy, question, views) and `optionRange`.
+- `app/tools/[tool]/page.tsx` (new): the server-rendered page. `app/tools/[tool]/thumbnail-preview.tsx` (new): the picker, the list, the mocks (`PreviewMocks`) and "Let strangers pick".
+- `lib/photo-handoff.ts` (new): the in-memory hand-off of the picked files to the form.
+- `app/page.tsx`: reads the hand-off query and shows a notice ("Your 3 images from the Etsy thumbnail preview are options A–C…"). `app/create-poll-form.tsx`: starts from the hand-off. An option can hold an already uploaded photo without its file, and `uploadError` is shared with the tool. `lib/images.ts`: `isImageId`.
+- `lib/beacon.ts`: `path` on `visit`. `lib/site.ts`: the three paths in `PUBLIC_PAGES`, so they're in `/sitemap.xml`. `app/layout.tsx`: the footer's "Free tools" links. `app/privacy/page.tsx`: the path, and the fact that tool images stay on the device. `app/globals.css`: the tool page and mocks.
+- Tests (52 new, 406 in all, all passing; no existing assertion changed or removed):
+  - `tests/thumbnail-tools.test.ts` (31, always run): the three paths and only those; static params and 404s; each page's title, description and canonical; uniqueness against every other page; one h1 naming the tool; sitemap, `PUBLIC_PAGES` and robots; footer and cross-links; no invented claims. The mocks: 9 Etsy tiles at the three ratios, covers at 160 and 80 px uncropped, YouTube at 16:9 in grid and feed, blob: sources only, and 2 and 4 candidates. The form's hand-off: A–C prefilled with the question, bad, duplicate and extra ids dropped, and the blank form otherwise. The beacon's path for each tool and search page, never the query, once per session. The privacy copy.
+  - `tests/thumbnail-tools-browser.test.ts` (15, Playwright with Chromium, desktop 1280×800 and iPhone 13 at 390 px, against the dev server):
+    - each tool answers 200 with its own `<title>`, meta description and h1, `/sitemap.xml` lists all three, and an unknown slug is a 404;
+    - Etsy's 9 tiles measure 1:1, 4:3 and 5:4, with no POST or `/images` request while previewing;
+    - the covers measure about 160 and 80 px tall, side by side;
+    - YouTube measures 16:9 in grid and feed;
+    - for every tool at both sizes, "Let strangers pick" gives three 201 uploads, then the form with A–C thumbnails and the question, then a posted poll whose three photos load (200), with nothing uploaded twice;
+    - the 2–4 limits, and a refused upload (415) shown in its slot and retried without re-sending;
+    - each tool page's visit beacon carries its own path (the signal URL is answered inside the test browser, so nothing is sent to RepoHQ).
+  - `tests/launch.test.ts`: its every-public-page checks now include the three tools (it's keyed on `PUBLIC_PAGES`).
+  - Mutation-checked, then reverted: without the beacon's `path`, 4 tests fail; uploading on pick instead of on the button fails the Etsy browser test at both sizes.
+- `npm run build` passes (the three tools are SSG), and so does `npm run typecheck -- --noUnusedLocals --noUnusedParameters`.
+- `npm run screenshots`: the Etsy tool with three mug photos, the prefilled new-poll form, and the posted poll, at desktop and phone size (6 PNGs). They replace the photo-upload shots: the form and poll page are the same, now reached from the tool.
+
+**Pre-landing review** (gstack checklist, against `git diff` and the new files)
+- **Pass 1, CRITICAL: nothing open.**
+  - No new SQL; uploads go through the existing `POST /images`, with its lock and cap.
+  - No raw HTML. The query's `photo` values must match the id pattern before they're used, and `tool` is only looked up in `TOOLS`. File names render as text, and image sources are the visitor's own `blob:` URLs or tiebreak's paths. The navigation is same-origin.
+  - New values traced: the view layouts (`grid`, `feed`, `shelf`) through `sizeIn`, the section class and the CSS; the three new `PUBLIC_PAGES` through the sitemap, robots and `tests/launch.test.ts`'s exhaustive record.
+  - Photo ids in the form's URL stay in the browser's history. They don't leak: the beacon sends the path only, cross-site requests carry only the origin as referrer (the browser default), and poll images load with `no-referrer`. Once the poll is posted they're public anyway.
+- **Fixed during review:** two exported types nothing imported (`Prefill`, `PreviewCandidate`); two over-long lines; the book-cover lede said readers "ever" see covers small first, which is now "often".
+- **Open, decided here:**
+  - [P2] (confidence 6/10) **RepoHQ has to accept the extra `path` field on `visit`.** The mission asks for it, but this repo can't check the endpoint. After the deploy, open a tool page in a normal browser and check that RepoHQ's Ideas page counts the visit. If it doesn't, remove the one `path` line in `lib/beacon.ts`.
+  - [P3] (confidence 5/10) **A crafted `/?photo=…` link prefills someone else's form** with photos they can't see ("Uploaded photo"). Posting needs them to press Create. The ids are random and only the uploader knows them, so the only photos that can be put there are the link sender's own. Accepted.
+  - [P3, carried] no rate limits (BUILD.md's P1). The tools add no new write path beyond `POST /images`, which keeps its 200 MB cap.
+
+**Metric:** unique visitors a week, from RepoHQ's Ideas page for tiebreak (the `visit` events). The baseline is 1 a week (6 the week before, 7 all time); the target is 50 a week within 14 days of the merge. The tools' own share is the `visit` events whose `path` starts with `/tools/`, and their `referrer` shows how many came from search (google.com, bing.com, duckduckgo.com). The search pages' visits carry their own paths from now on, so the two experiments can be read apart. Secondary: `activate` from the polls the tools hand off. New pages can take more than 14 days to be indexed, so before reading a miss as a failure, check indexing (`site:tiebreak-phi.vercel.app/tools`), and submit `/sitemap.xml` in Google Search Console if David has it.

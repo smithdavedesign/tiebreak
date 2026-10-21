@@ -470,3 +470,159 @@ button.danger {
 .guide-cta p {
   margin: 0;
 }
+
+/* Preview tools: a wider page, the picker and its list, and the mocks (a results grid, a phone feed, a shelf of covers) */
+main:has(> .tool-page) {
+  max-width: 64rem;
+}
+
+.tool-page > .lede,
+.tool-page .terms {
+  max-width: 40rem;
+}
+
+.tool-controls {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.photo-pick:has(input:disabled) .pick {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.candidates li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+}
+
+.candidates .error {
+  flex-basis: 100%;
+}
+
+.tool-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.mocks {
+  display: grid;
+  gap: 1rem;
+}
+
+.mock {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 0.75rem;
+}
+
+.mock h2 {
+  font-size: 1rem;
+  margin: 0 0 0.6rem;
+}
+
+.mock-bar {
+  display: block;
+  height: 1.6rem;
+  max-width: 24rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--bg);
+}
+
+.mock-tiles {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mock-grid .mock-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--tile), 45%), 1fr));
+}
+
+.mock-feed .mock-tiles {
+  max-width: 24rem;
+  padding: 0.75rem 0;
+  border: 0.375rem solid var(--ink);
+  border-radius: 1.5rem;
+}
+
+.mock-shelf .mock-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.tile {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.tile img,
+.tile-empty {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: var(--bg);
+}
+
+.tile-empty {
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.mock-feed .tile img,
+.mock-feed .tile-empty {
+  border-radius: 0;
+}
+
+.mock-feed figcaption {
+  padding: 0 0.6rem;
+}
+
+.mock-shelf .tile img,
+.mock-shelf .tile-empty {
+  width: auto;
+  max-width: 100%;
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.tile figcaption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.mock-line {
+  grid-column: 2;
+  display: block;
+  height: 0.45rem;
+  border-radius: 1rem;
+  background: var(--line);
+}
+
+.mock-line.short {
+  width: 60%;
+}

@@ -37,6 +37,8 @@ const ID_PATTERN = /^[A-Za-z0-9_-]{16}$/
 const PATH_PATTERN = /^\/images\/([A-Za-z0-9_-]{16})$/
 
 export const imagePath = (id: string) => `/images/${id}`
+/** A well-formed photo id (what POST /images returns), as the preview tools pass to the new-poll form. */
+export const isImageId = (id: string) => ID_PATTERN.test(id)
 
 /**
  * The id of a photo uploaded to this server, when `url` is exactly its address here

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, type FormEvent } from 'react'
 import { sendSignal } from '@/lib/beacon'
 import type { AccountView } from '@/lib/credits'
+import { handedOver } from '@/lib/photo-handoff'
 import {
   IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -43,18 +44,28 @@ type Draft = {
 }
 const blank = (): Draft => ({ text: '', imageUrl: '', photo: null, uploaded: null, photoError: null })
 
-/** The message for a refused upload: the server's own, else one for the status. */
-function uploadError(status: number, body: { error?: unknown } | null) {
+/** The message for a refused upload: the server's own, else one for the status. The preview tools use it too. */
+export function uploadError(status: number, body: { error?: unknown } | null) {
   if (typeof body?.error === 'string') return body.error
   // Vercel refuses a request body over 4.5 MB itself, before the app sees it.
   if (status === 413) return 'That photo is too big to upload. Try a smaller copy of it.'
   return "The photo didn't upload. Try again."
 }
 
-export function CreatePollForm({ account, plan }: { account: AccountView; plan: Plan }) {
+/** What a preview tool's "Let strangers pick" starts the form with: its question, and photos on tiebreak (paths). */
+type Prefill = { question: string; photos: string[] }
+
+/** One option per handed-over photo (already uploaded), and at least MIN_OPTIONS. */
+function draftsFor(photos: string[]): Draft[] {
+  const drafts = photos.slice(0, MAX_OPTIONS).map((path): Draft => ({ ...blank(), photo: handedOver(path), uploaded: path }))
+  while (drafts.length < MIN_OPTIONS) drafts.push(blank())
+  return drafts
+}
+
+export function CreatePollForm({ account, plan, prefill }: { account: AccountView; plan: Plan; prefill?: Prefill }) {
   const router = useRouter()
-  const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState<Draft[]>([blank(), blank()])
+  const [question, setQuestion] = useState(prefill?.question ?? '')
+  const [options, setOptions] = useState<Draft[]>(() => draftsFor(prefill?.photos ?? []))
   const [target, setTarget] = useState(String(DEFAULT_TARGET))
   const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [isPublic, setIsPublic] = useState(false)
@@ -74,8 +85,9 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
   async function uploadPhotos(): Promise<(string | null)[] | null> {
     const results = await Promise.all(
       options.map(async (o, i): Promise<string | null | false> => {
+        // Already on tiebreak (uploaded here, or by a preview tool as a path): its full URL, as POST /polls takes it.
+        if (o.uploaded) return new URL(o.uploaded, location.href).href
         if (!o.photo) return null
-        if (o.uploaded) return o.uploaded
         const res = await fetch('/images', {
           method: 'POST',
           headers: { 'content-type': o.photo.type || 'application/octet-stream' },
@@ -155,9 +167,14 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
             placeholder="Text"
             onChange={(e) => update(i, { text: e.target.value })}
           />
-          {option.photo ? (
+          {option.photo || option.uploaded ? (
             <div className="photo">
-              <Thumbnail file={option.photo} alt={`Option ${LETTERS[i]} photo preview`} />
+              {option.photo ? (
+                <Thumbnail file={option.photo} alt={`Option ${LETTERS[i]} photo preview`} />
+              ) : (
+                // Handed over by a preview tool after a reload: stored, but not served until the poll uses it.
+                <span className="photo-name">Uploaded photo</span>
+              )}
               <button
                 type="button"
                 className="link"
@@ -187,7 +204,7 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
                 e.target.value = '' // so picking the same file again still counts
               }}
             />
-            <span className="pick">{option.photo ? 'Change photo' : 'Upload a photo'}</span>
+            <span className="pick">{option.photo || option.uploaded ? 'Change photo' : 'Upload a photo'}</span>
             <span className="hint">{PHOTO_HINT}</span>
           </label>
           {option.photoError && (

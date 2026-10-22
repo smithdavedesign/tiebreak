@@ -21,7 +21,7 @@ Voting in the feed is the free user's action and isn't counted.
 | `/terms`: no warranty, "$5, paid once", REVENUE.md's "verdict within 48 hours or a refund" (plus the existing 14-day refund), contact through GitHub issues | `app/terms/page.tsx` |
 | Footer links to both pages | `app/layout.tsx` |
 | Buy button ("Get Pro for $5") going to `STRIPE_PAYMENT_LINK`, hidden when it's unset | `app/pro/page.tsx`, `paymentsReady()` in `lib/stripe.ts` |
-| Visit beacon: `visit` (once per session, every page), `activate` (first poll created, once per browser), `checkout` (Buy click). Sends nothing for webdriver, outside production, or with `repohq:notrack` set | `lib/beacon.ts`, `app/visit-beacon.tsx`, `app/create-poll-form.tsx`, `app/pro/upgrade-button.tsx` |
+| Visit beacon: `visit` (once per session, every page; the thumbnail tool pages send theirs with a `path`, once per session each, since 2026-10-22), `activate` (first poll created, once per browser), `checkout` (Buy click). Sends nothing for webdriver, outside production, or with `repohq:notrack` set | `lib/beacon.ts`, `app/visit-beacon.tsx`, `app/tools/thumbnail-tool.tsx`, `app/create-poll-form.tsx`, `app/pro/upgrade-button.tsx` |
 | Provisioning request for the pipeline | `.provision` |
 | Screenshots: start page, core action result, Buy button with footer, at desktop and phone sizes | `docs/screenshots/`, `npm run screenshots`, top of README |
 

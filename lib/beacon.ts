@@ -36,19 +36,26 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
  * browser (localStorage); checkout: every Buy click. No cookies. Sent as text/plain so the browser needs
  * no CORS preflight; the endpoint parses the JSON body. If storage is unavailable, nothing is sent
  * rather than repeating a once-only event.
+ *
+ * `path` is for the visits of pages counted apart (the thumbnail tools, lib/tools.ts): such a page's visit
+ * carries it and is sent once per session for that page, even after the session's first visit; it also
+ * counts as that first visit.
  */
-export function sendSignal(kind: SignalKind): void {
+export function sendSignal(kind: SignalKind, path?: string): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
     if (!shouldSend({ vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV, webdriver: navigator.webdriver === true, optedOut })) return
     if (kind === 'visit') {
-      if (sessionStorage.getItem(VISITED_KEY)) return
+      const key = path ? `${VISITED_KEY}:${path}` : VISITED_KEY
+      if (sessionStorage.getItem(key)) return
+      sessionStorage.setItem(key, '1')
       sessionStorage.setItem(VISITED_KEY, '1')
     } else if (kind === 'activate') {
       if (localStorage.getItem(ACTIVATED_KEY)) return
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer: referrerFor(document.referrer, location.origin) })
+    const referrer = referrerFor(document.referrer, location.origin)
+    const body = JSON.stringify(path ? { slug: 'tiebreak', kind, referrer, path } : { slug: 'tiebreak', kind, referrer })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

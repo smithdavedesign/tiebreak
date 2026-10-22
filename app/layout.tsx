@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { GUIDES } from '@/lib/guides'
 import { HOME_TITLE, JSON_LD, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
+import { TOOLS } from '@/lib/tools'
 import { VisitBeacon } from './visit-beacon'
 import './globals.css'
 
@@ -46,6 +47,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <span key={g.path}>
                 {i > 0 && ' · '}
                 <Link href={g.path}>{g.label}</Link>
+              </span>
+            ))}
+          </p>
+          <p className="guide-links">
+            Free tools:{' '}
+            {TOOLS.map((t, i) => (
+              <span key={t.path}>
+                {i > 0 && ' · '}
+                <Link href={t.path}>{t.name}</Link>
               </span>
             ))}
           </p>

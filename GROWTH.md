@@ -98,3 +98,59 @@ SELECT count(*) AS polls, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM images i 
   FROM polls p WHERE p.created_at >= '<merge date>' AND p.creator_id IS DISTINCT FROM 'house';
 ```
 (`'house'` is `HOUSE_ID` in `lib/house.ts`, the starter polls' creator, left out.) At under 50 visitors a week, a 10% rate is a handful of polls, so read the counts, not just the percentage.
+
+## 2026-10-22: free thumbnail preview tools (Etsy, book cover, YouTube)
+
+**Mission:** a free side-by-side thumbnail preview tool. Buyers search for free thumbnail-preview tools, and the ones that exist show one image at a time with no vote. tiebreak's tool previews 2–4 candidates side by side and hands them to a poll in one click. It's a search-landing tool, so it's a different kind of thing from the three content pages in the running SEO experiment.
+
+**Hypothesis:** people who search for a thumbnail preview tool find one of the three pages, use it, and some of them put their candidates to a vote.
+
+**Decisions** (nobody to ask, so decided here)
+- **Three pages, one tool.** `/tools/etsy-thumbnail-preview`, `/tools/book-cover-thumbnail-test` and `/tools/youtube-thumbnail-preview` each have their own title, description, h1, copy and mock. They share one client component (`app/tools/thumbnail-tool.tsx`). `lib/tools.ts` lists them once for the footer, the beacon and the tests; the paths are also in `PUBLIC_PAGES`, so the sitemap lists them. The pages are static.
+- **Mocks, from the mission:** Etsy shows each image in a search-grid mock at 1:1, 4:3 and 5:4 crops (centre-cropped, as `object-fit: cover` does). Book covers show uncropped, about 160 px and 80 px tall, side by side (the row scrolls sideways on a phone if they don't fit). YouTube shows each thumbnail at 16:9 in a desktop-grid tile and a phone-feed tile. The tiles show the option letter and grey bars, not a made-up title or price. The length badge on the YouTube tile is a placeholder (12:34) that shows which corner it covers.
+- **Nothing leaves the device until "Let strangers pick".** Previews are drawn from object URLs. Only JPEG, PNG and WebP are taken, the types a poll photo can be (anything else is skipped with a note), and 4 at most, the most options a poll takes. The button needs 2 images, the fewest a poll takes.
+- **"Let strangers pick" uploads, then opens the existing new-poll form.** The images go to `POST /images`, the same upload the form uses (now one shared `uploadPhoto` in `app/create-poll-form.tsx`). Then the form on `/` opens with them as options A, B, C (and D), plus a question that fits the tool, e.g. "Which photo would you click in Etsy search?". Posting the poll stays where it was, so `activate` still fires on its `201`. A refused image keeps you on the tool page, with the reason next to it and a line by the button. On a retry only the images not already up are uploaded, and the form doesn't upload them again.
+- **The hand-off lives in page memory.** The tool hands the `File`s and their URLs to the form (`handOffToNewPoll`) and navigates there client-side, so the form shows the same thumbnails and Change/Remove photo work as usual. Considered and not used: URL parameters (an uploaded photo isn't served until a poll uses it, so the form couldn't show it) and sessionStorage (a 5 MB photo doesn't fit). Cost: reloading the form drops the hand-off. The uploaded photos then go unused and are deleted after a day, like any other unused upload.
+- **The visit beacon, with a path for the tools only.** A tool page sends its own `visit` with `"path": "/tools/…"`, once per session per tool page. The layout's beacon skips tool pages, so a landing on one sends exactly one event, whichever effect runs first. The tool visit also marks the session as visited. Every other page's `visit` is unchanged: no `path`, once per session. So the search pages of the SEO experiment and the tools count apart (`path` present or not). One consequence: a session that starts on `/` or a search page and then opens a tool sends two visits, the second tagged with the tool. Poll pages never send a path, since their URL is a share link. The privacy page says a tool visit names its page.
+- **Shared dev server for the browser tests.** Next 16 locks `.next` per project (`experimental.lockDistDir`, on by default), so a second browser-test file couldn't start its own `next dev`. `tests/browser-app.ts` is now a vitest `globalSetup` that starts one dev server when `CHROMIUM_PATH` is set, and both browser files use it. `tests/photo-upload-browser.test.ts` lost its own start-up code; its tests are unchanged. The server runs with `NEXT_PUBLIC_VERCEL_ENV=production` so the beacon code runs as it does live. Automated browsers still send nothing (`navigator.webdriver`), and the one test that clears that flag answers the signal endpoint itself. A side effect: with `CHROMIUM_PATH` set, any `vitest` run starts the dev server, even for one unrelated file.
+- **Copy:** says what the tool does, what it doesn't upload, and gives three generic checks per page. No numbers beyond the tool's own crops and sizes, and no user counts, quotes or claims about how any platform ranks images. The book page reuses the search page's line that covers are "judged at a glance, by strangers, at a small size".
+- **Scope check:** more than 8 files changed (three thin pages, one component, wiring, tests and docs), with no new service or dependency. Not in scope: dragging the crop, uploading from the tool in the native app, more platforms, and shrinking photos before upload (the 4.5 MB Vercel gap from 2026-10-19 applies here too).
+
+**What changed**
+- New: `lib/tools.ts`, `app/tools/thumbnail-tool.tsx` (the picker, the mocks in `Previews`, the hand-off) and the three `app/tools/*/page.tsx`.
+- `app/create-poll-form.tsx`: `uploadPhoto` (moved out of the submit code, same behaviour) and `handOffToNewPoll`, which the form reads once when it opens.
+- `lib/beacon.ts`: `sendSignal(kind, path?)`. `app/visit-beacon.tsx`: `countVisit` skips tool pages.
+- `lib/site.ts`: the three paths in `PUBLIC_PAGES`. `app/layout.tsx`: a "Free tools" line in the footer. `app/privacy/page.tsx`: tool previews stay in the browser, and a tool visit names its page. `app/globals.css`: the tool styles (tool pages get a wider `main`).
+- Checkout, Stripe, prices and the `activate`/`checkout` events are untouched.
+- `npm run screenshots` now shows the Etsy tool with three mug photos, the form those three open, and the closed poll's result (6 PNGs). The book-cover and YouTube pages are covered by the browser test, not the shots.
+- Tests (51 new, 405 in all, all passing; `tsc`, the unused-code typecheck and `next build` are clean):
+  - `tests/thumbnail-tools.test.ts` (27): titles, descriptions, canonical URLs and one h1 per page, naming the tool; the sitemap, `PUBLIC_PAGES` and footer; the picker and the disabled button; honest copy; the mocks' tile counts (3 images → 9 Etsy tiles), crops, shelves and YouTube tiles; and the beacon's `path`, once per session per tool, in either effect order.
+  - `tests/thumbnail-tools-browser.test.ts` (18, Chromium, desktop 1280×800 and iPhone 13 at 390 px): each page's 200, `<title>`, description and h1, and `/sitemap.xml`; 9 Etsy tiles at measured 1:1, 4:3 and 5:4 with no upload request; covers at 160 ± 2 and 80 ± 2 px tall, side by side; YouTube tiles at 16:9 in the grid and the feed; "Let strangers pick" on all three tools at both sizes (3 uploads, the form with A–C, a `201` from `POST /polls`, the poll showing the same photos in the same order); a refused 5 MB+ photo and the retry; each tool page sending one visit with its own path, and a search page's visit without one.
+  - `tests/launch.test.ts` now covers the three pages in its every-public-page checks.
+  - Mutation-checked (each reverted): dropping the hand-off fails 6 tests, dropping the path fails 4, wrong 5:4 or 80 px CSS fails 4, and the layout beacon not skipping tool pages fails 1.
+
+**Pre-landing review** (gstack checklist, against `git diff` and the new files)
+- **Pass 1, CRITICAL: nothing open.**
+  - No SQL, and no server code changed.
+  - No raw HTML. File names render as text, image sources are object URLs the page made itself, and `router.push` only gets the constant `/`.
+  - Uploaded URLs go through the existing own-origin check in `POST /polls`.
+  - Enum completeness: `ToolKind` maps to its mock through an exhaustive `Record` (it fell through to YouTube before the review). The new tool paths are in every list that holds public pages (`PUBLIC_PAGES`, the launch test's record). Every `sendSignal` caller was read: `activate` and `checkout` are unchanged.
+  - No secrets, and test images are drawn at runtime.
+- **Fixed during review:** the exhaustive mock map (above), and a refused upload now also says so by the button. On a phone the reason sits far above it. A test covers both.
+- **Open, decided here:**
+  - [P3] A very fast double tap on "Let strangers pick" can upload twice before the button disables (the form has the same pattern). The extra photos go unused and are deleted after a day.
+  - [P3] The hand-off doesn't survive a reload of the form (above).
+  - [P2, carried] no rate limits on `POST /images`.
+- **Leftover file:** `scripts/look-tmp.mjs`, a throwaway script used once to look at the book-cover and YouTube pages. The sandbox doesn't allow deleting files, so it's listed in `.gitignore` instead. Delete the file and that line.
+
+**Needs checking on RepoHQ's side:** the signal endpoint must keep the new `path` field on `visit` events. If it drops unknown fields, tool visits still count as visits but can't be told apart.
+
+**Metric:** unique visitors a week to the three tool pages, from RepoHQ's Ideas page for tiebreak: `visit` events whose `path` starts with `/tools/`. The baseline is 0 (the pages are new). The target is 50 a week within 14 days of the merge. The `referrer` on those events shows how many come from search (google.com, bing.com, duckduckgo.com). Submit `/sitemap.xml` in Google Search Console if David has it, and check indexing with a `site:` search for `/tools/`. New pages can take weeks to be indexed, so a miss on day 14 doesn't prove the idea wrong.
+
+To see whether tool visitors go on to post, count polls that kept a tool's question, in the Neon SQL editor. It's a lower bound, since people can edit the question:
+```sql
+SELECT question, count(*) FROM polls
+ WHERE created_at >= '<merge date>'
+   AND question IN ('Which photo would you click in Etsy search?', 'Which book cover would you pick up?', 'Which thumbnail would you click?')
+ GROUP BY question;
+```

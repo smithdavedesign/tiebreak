@@ -30,6 +30,10 @@ export default function PrivacyPage() {
           the file first. Anyone with the poll&apos;s link sees them (and the public feed, if you post it there). A photo
           no poll uses is deleted after a day, and deleting a poll deletes its photos.
         </li>
+        <li>
+          Nothing from the thumbnail tools until you ask for a poll: their previews are drawn in your browser. Pressing
+          &ldquo;Let strangers pick&rdquo; uploads the images as photos for a new poll, as above.
+        </li>
         <li>Your votes and reports, with the time. Creators can download the votes on their own polls (time and option, never who voted).</li>
         <li>
           If you buy Pro: Stripe handles your card and we never see it. Stripe tells us your email, the amount and the
@@ -50,10 +54,11 @@ export default function PrivacyPage() {
         Our own counter (RepoHQ) gets three anonymous events: a &ldquo;visit&rdquo; (the first page you open in a browser
         session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
         (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
-        your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
+        your browser shares it. A visit to one of the free thumbnail tools also says which tool page it was, and is counted
+        once per session for each. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
         with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
         automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting
-        you twice, your browser keeps two small flags in its own storage; they never leave your device. There are no
+        you twice, your browser keeps a few small flags in its own storage; they never leave your device. There are no
         third-party analytics, ad trackers or pixels.
       </p>
 

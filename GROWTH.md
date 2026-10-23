@@ -98,3 +98,73 @@ SELECT count(*) AS polls, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM images i 
   FROM polls p WHERE p.created_at >= '<merge date>' AND p.creator_id IS DISTINCT FROM 'house';
 ```
 (`'house'` is `HOUSE_ID` in `lib/house.ts`, the starter polls' creator, left out.) At under 50 visitors a week, a 10% rate is a handful of polls, so read the counts, not just the percentage.
+
+## 2026-10-23: poll share cards and "Make your own tiebreak"
+
+**Mission:** poll share cards and a "make your own" loop for voters. The concierge plan and the launch posts both get votes by sharing poll links in communities and chats, where a link unfurled as plain text (every poll page used the site-wide picture). A card showing the actual candidates gets clicked, and every voter who arrives could make a poll of their own.
+
+**Hypothesis:** a shared poll link that unfurls as a picture of the poll (its question and the seller's own photos) gets more clicks than a plain link, and a voter shown "Make your own tiebreak" right after voting posts a poll of their own, which they share again.
+
+**Decisions** (nobody to ask, so decided here)
+- **An explicit route, `GET /p/:id/card`, not the `opengraph-image.tsx` file convention.** Next's convention [Layer 1] would also work, but it gives the image a generated address and its own caching. With a route, the page lists one known URL in both `og:image` and `twitter:image` (with width, height and alt text), the card can be cached by the poll's state, and a failure can fall back. Poll pages are not blocked in `robots.txt` (only `/polls` is), so crawlers can fetch both the page and the card.
+- **The card is drawn for nobody in particular.** No cookie is read, so everyone (and every crawler) gets the same picture, and a private poll's result never shows on it, even if its creator's browser asks. A closed private poll's card says "The result is private".
+- **What the card shows:** the question, and each option as a tile with its letter: the photo (cropped to fit) for a photo option, the text for a text option. While open: "Tap to vote". Once closed: "Closed · 3 votes", the winner framed in green and labelled "Winner", and each option's percentage, vote count and bar; a tie says so and marks no winner; a poll nobody voted on says "No votes came in". Colours and font sizes follow the site (`app/globals.css`); the font is the Geist that ships with `next/og`.
+- **The card's address carries the poll's state** (`/p/:id/card?v=open`, then `?v=closed`), so a chat app that cached the open card fetches the result as a new image. Any other address (an old `v`, a made-up query) gets a 307 to the current one, uncached. That way only one address per state is ever drawn, and a made-up query can't make the server draw the card and fetch its image links over and over. Caches may keep an open poll's card 5 minutes and a closed one a day (it never changes again; the day also bounds how long a card outlives a poll deleted by moderation, as for photos).
+- **Photos on the card.** Photos uploaded to tiebreak are read from the database, not fetched. Image links are fetched once per drawing, with SSRF guards: https only; the host must resolve only to public addresses (private, loopback, link-local/cloud-metadata, carrier-grade NAT, multicast and reserved ranges are refused, including IPv4-mapped IPv6), checked again at each redirect (at most 3); 4 seconds in all; at most 5 MB, read with the same capped reader as uploads; no cookies. The bytes must then pass the upload check (`inspectImage`) as a JPEG or PNG. A card decodes at most 100 megapixels of photos in all (4 bytes a pixel, in memory); options past that show their text.
+- **WebP photos show as the option's letter and text.** A spike found that the image renderer bundled with `next/og` (resvg) paints WebP as blank, both lossy and lossless, without an error. JPEG and PNG draw. Phones upload JPEG (iOS converts HEIC to JPEG for an upload), so most photos show.
+- **Sideways phone photos are turned upright**, as browsers show them: `inspectImage` now also returns a JPEG's EXIF orientation (it already read it to keep photos upright), and the card turns the photo by it. The mirrored orientations (front cameras) are turned but not flipped back.
+- **Long text never runs off the card.** The question's type size goes down with its length (60, 48, 40, 34 px), every text box has a fixed size and a line clamp ending in "…", and each text also clips to its box. The clip covers a satori quirk the tests found: it always adds one more letter before the "…", which can stick out when a single unbroken word (a pasted link) fills the line. The API caps questions at 140 characters; the card is tested at 200 so it holds past that (and with the widest letters).
+- **If drawing fails**, the card is drawn again without photos (for example, a lossless JPEG the renderer can't read), and if that fails too, the route sends a 307 to the site's own card, uncached, so the next request tries again.
+- **Who sees "Make your own tiebreak":** anyone but the poll's creator, once they have voted on it, or once it has closed (they arrived too late to vote). The creator already made one. It's a plain `<a href="/?ref=poll">`, not a Next `<Link>`: the full page load runs the layout's visit beacon on arrival. Copy: "**Stuck on a choice of your own?** Post 2–4 options and share the link. It's free." (an unlisted poll costs no credit and no Pro; the wording is the start page's own).
+- **The beacon's `ref` tag.** A visit to a page whose address has `?ref=<tag>` carries `"ref": "<tag>"`. The tag must be 1 to 32 lower-case letters, digits or dashes, and anything else is dropped, so no other part of an address is ever sent. A tagged visit is sent once per session per tag, even if this session already sent a visit (the voter's poll-page visit came first), and it counts as the session's visit, so no untagged one follows. Untagged visits, `activate` and `checkout` send exactly what they did before (no `ref` key). The privacy page says so, and says the server fetches linked option images to draw the card.
+- **No new dependency, service or key**, so no `.provision` line. Checkout, Stripe, prices and payment links are untouched.
+
+**What changed**
+- `lib/share-card.tsx` (new): the card's layout (`CARD`, `tileBoxes`, `resultBarBox`), `cardPath`, `cardAlt`, `CARD_CACHE`, the satori tree (`pollCardElement`), photo loading with the fetch guards (`loadThumbnails`), and `pollCardPng` with its fallback.
+- `app/p/[id]/card/route.ts` (new): `GET /p/:id/card?v=<status>` → 200 PNG (`nosniff`, cached by state) | 307 to the current address | 404 (not cached).
+- `app/p/[id]/page.tsx`: `og:image` and `twitter:image` point at the poll's card (1200×630, with alt text); a poll that doesn't exist keeps the site's card.
+- `app/p/[id]/poll-view.tsx`, `app/globals.css`: the "Make your own tiebreak" block.
+- `lib/beacon.ts`: `refFor`, and the tagged visit. `app/privacy/page.tsx`: the tag and the card.
+- `lib/images.ts`: `inspectImage` also returns `orientation` (an added field; nothing else changed). `lib/http.ts`: `readCapped` also takes a fetched response.
+- `vitest.config.ts`: two projects, so the two browser test files (each starts `next dev`, which holds a lock on `.next/`) run one at a time after the rest. CI, without `CHROMIUM_PATH`, skips them as before.
+- The native app needs nothing: its Share sends the same `/p/:id` link, which now unfurls as the card.
+- Tests (42 new, 396 in all, all passing; the 354 earlier ones are unchanged but one, below):
+  - `tests/share-card.test.ts`: the tags (`og:image` and `twitter:image` with `summary_large_image`, the address changing on close, the site card for an unknown poll); the route (1200×630 PNG, headers, caching, 404s, the redirect, a private poll's card identical with and without its creator's cookie); what's drawn, read back from the PNG's pixels (the uploaded photo and a linked image in their tiles, text in a text tile, the winner's green frame, bars filled 67% and 33%, a tie, no votes, a private result, WebP, EXIF orientation, the no-photo fallback); the fetch guards (public IPv4 and IPv6 hosts and redirects fetched; private, loopback, link-local, mapped, unresolvable, plain-http and redirected-to-private never asked; non-images, over 5 MB, errors and redirect loops skipped); and the overflow test: 4 options of 80 characters with a 200-character question, open, closed and in the widest letters (and the widest letters with 2 options, the biggest type), each a valid PNG (every chunk's CRC, the zlib stream and each row's filter are checked) with nothing in the card's margin, the gap under the question or any tile's padding, plus a snapshot of where ink falls (`tests/__snapshots__/share-card.test.ts.snap`). `tests/png-pixels.ts` is the PNG reader these use.
+  - `tests/make-your-own.test.ts`: the link on the rendered poll page (not before voting; after voting; on the result; for a late arrival; never for the creator), and the beacon: following it records `ref: "poll"` though the poll page already counted a visit; once per session; untagged events unchanged; nothing off production; bad tags dropped. Plus the privacy copy.
+  - `tests/share-card-browser.test.ts` (Chromium, iPhone 13 width, against `next dev`): the poll page's real HTML has one `og:image`, its width and height, the alt text, `twitter:card` and `twitter:image`, and fetching that address gives a 1200×630 PNG with a real JPEG photo in its tile and a real WebP's option drawn as text; a sideways phone JPEG comes out upright; and a voter votes, clicks "Make your own tiebreak", lands on `/?ref=poll`, and the beacon's two visits are captured in the page (the second with `ref: "poll"`). Nothing reaches RepoHQ: the signal request is answered inside the page, and any request to RepoHQ is aborted.
+  - Changed: `tests/launch.test.ts`'s poll-share-page test expected poll pages to list the site's picture; it now expects the poll's own card in both `og:image` and `twitter:image`, which is stricter.
+- `npm run screenshots`: the open poll's card, the closed poll's card, the voter's page with "Make your own tiebreak" (desktop and phone) and the start page it opens (desktop and phone). The cards are images, so they're taken once, at desktop size; the older shots were replaced (6 PNGs, the cap).
+
+**Pre-landing review** (gstack checklist, against `git diff` and the new files)
+- **Pass 1, CRITICAL: nothing open.**
+  - No new SQL; the card reads the poll with the existing parameterised `getPoll` (which may close an overdue poll under its row lock, as the page does) and photos with `readImage`.
+  - No raw HTML. User text reaches the card only as text that satori draws as glyph outlines; the alt text goes through Next's metadata, which escapes it.
+  - [Fixed] (confidence 8/10) `app/p/[id]/card/route.ts`: the card fetches image links server-side, so any query that skipped the CDN cache (`?v=<random>`) made the server draw the card and fetch someone else's image again. Only the current address is drawn now; anything else is a cheap, uncached 307.
+  - SSRF: the guards above, with tests for each refusal. Satori's own fetching is never used (photos reach it as bytes).
+  - Enum completeness: `CARD_CACHE` is a `Record<Status, …>`, so a new poll status can't skip a cache decision; the card's states cover open, closed with a winner, a tie, no votes and a hidden private result; `SignalKind` is unchanged.
+- **Fixed during the build:** text that overflowed a tile's padding (found by the overflow test, above); WebP drawn as a blank tile (found by a spike); sideways phone photos.
+- **Auto-fixed:** an unused test variable; the card now sends `nosniff`, like `/images/:id`.
+- **Open, decided here:**
+  - [P1, carried] no rate limits. Someone could post many polls whose image links point at one host, and ask for each card once per state; each draws and fetches once, then the CDN answers.
+  - [P2] (confidence 6/10) DNS rebinding: a host could answer the guard's lookup with a public address and the fetch's with a private one. What comes back is only ever drawn as a JPEG or PNG on a public card, and Vercel's functions have no private network to reach.
+  - [P2] emoji in a question make `next/og` fetch the emoji image from a CDN while drawing; if that fails, the site's card is sent instead, and the next request tries again.
+  - [P3] a preview deployment's tags point at the production card (`metadataBase` is the site's address, as before), where its polls don't exist.
+  - [P3] the card decodes each photo whole; four 12-megapixel photos is about 200 MB of memory and a second or two, after which the CDN serves it.
+
+**Metric:** unique visitors a week, from RepoHQ's Ideas page for tiebreak (the `visit` events). The baseline is 0 this week (7 the week before); the target is 50 a week within 14 days of the merge (read the 7 days ending on day 14). To see what the change brought:
+- Visits tagged `ref: "poll"` are voters who followed "Make your own tiebreak". **Needs checking on RepoHQ's side:** the signal endpoint must keep (and the Ideas page show) the new `ref` field; if it ignores it, those visits still count as visits. Its per-IP limit ("a few counts an hour") should let a tagged visit through after the poll page's.
+- A visit's `referrer` shows clicks from sites that send one (reddit.com, facebook.com, t.co). Many chat apps (Discord, Slack, iMessage, WhatsApp) send none, so clicks on a card there count as direct visits.
+- Check the card itself once deployed: paste a poll's link into Meta's Sharing Debugger (developers.facebook.com/tools/debug), or into a Discord or Slack message to yourself.
+- Whether voters go on to post, in the Neon SQL editor:
+```sql
+SELECT
+  (SELECT count(*) FROM votes v JOIN polls p ON p.id = v.poll_id
+    WHERE v.created_at >= '<merge date>' AND v.voter_id IS DISTINCT FROM p.creator_id
+      AND p.creator_id IS DISTINCT FROM 'house') AS votes_on_peoples_polls,
+  (SELECT count(*) FROM polls p
+    WHERE p.created_at >= '<merge date>' AND p.creator_id IS DISTINCT FROM 'house'
+      AND EXISTS (SELECT 1 FROM votes v JOIN polls q ON q.id = v.poll_id
+                   WHERE v.voter_id = p.creator_id AND v.created_at < p.created_at
+                     AND q.creator_id IS DISTINCT FROM p.creator_id AND q.creator_id IS DISTINCT FROM 'house')) AS polls_by_earlier_voters;
+```
+`polls_by_earlier_voters` counts new polls whose creator had first voted on someone else's poll: the loop working. At these numbers, read the counts, not rates.

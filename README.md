@@ -2,22 +2,25 @@
 
 ## Screenshots
 
-![Start page with a photo picked for each option, thumbnails showing, desktop](docs/screenshots/home-desktop.png)
-![Start page with a photo picked for each option, thumbnails showing, phone](docs/screenshots/home-mobile.png)
+![The share card of an open poll: its question and both uploaded mug photos](docs/screenshots/card-open.png)
 
-The core action, posting a poll, now with photos: each option has "Upload a photo" (JPEG, PNG or WebP, up to 5 MB), and the picked photo shows as a thumbnail in its option before anything is sent.
+What a poll's link now unfurls as in chats and on social sites (its `og:image` and `twitter:image`, drawn by `GET /p/:id/card` at 1200×630): the poll's own question and both of the seller's photos, not plain text.
 
-![The new poll's swipe card with both uploaded photos, desktop](docs/screenshots/poll-desktop.png)
-![The new poll's swipe card with both uploaded photos, phone](docs/screenshots/poll-mobile.png)
+![The same poll's card once it closed: the winner marked, 67% to 33%](docs/screenshots/card-result.png)
 
-The poll it posted: both photos were uploaded with the poll and now load from tiebreak itself, on the card people swipe.
+Once the poll closes, the same link's card shows the result: the winner framed and labelled, and each option's share of the 3 votes.
 
-![Closed poll with the winning photo and the vote split, desktop](docs/screenshots/result-desktop.png)
-![Closed poll with the winning photo and the vote split, phone](docs/screenshots/result-mobile.png)
+![A stranger who voted on the shared link, offered "Make your own tiebreak", desktop](docs/screenshots/voted-desktop.png)
+![A stranger who voted on the shared link, offered "Make your own tiebreak", phone](docs/screenshots/voted-mobile.png)
 
-Its result: two strangers voted on the shared link, the creator swiped the third vote, and the poll closed with the winning photo and the split (2 to 1).
+A stranger opened the shared link and voted (the core action for a voter); the page now offers "Make your own tiebreak".
 
-Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two mug photos are drawn in the browser).
+![The start page the link opens (/?ref=poll), desktop](docs/screenshots/home-desktop.png)
+![The start page the link opens (/?ref=poll), phone](docs/screenshots/home-mobile.png)
+
+Following it opens the start page at `/?ref=poll`, where they can post their own poll; the visit counter records the `ref=poll` tag.
+
+Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two mug photos are drawn in the browser). The cards are images, so they're taken once, at desktop size.
 
 People post two options, strangers swipe to pick one, and the poll closes at a vote target or deadline; sellers and creators pay a few dollars for a fast verdict instead of PickFu's $15+.
 

@@ -1,8 +1,11 @@
 // npm run screenshots: starts the app, drives the main job with Playwright at
-// desktop and phone size (pick a photo for each option, post the poll, see both
-// photos on the voting card, collect votes, read the result), saves PNGs to
-// docs/screenshots/ and stops the app. Not part of `npm test`. The sample photos
-// are drawn in the browser (two mugs), so no real photo is used.
+// desktop and phone size, saves PNGs to docs/screenshots/ and stops the app. Not
+// part of `npm test`. The flow: a seller posts a poll with a photo for each option;
+// its link unfurls as the poll's share card; a stranger opens the link, votes and is
+// offered "Make your own tiebreak", which opens the start page; two more votes close
+// the poll, and its card shows the winner and the split. The cards are images
+// (1200×630), so they're taken once, at desktop size. The sample photos are drawn in
+// the browser (two mugs), so no real photo is used.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -23,8 +26,8 @@ const QUESTION = 'Which photo for my ceramic mug listing?'
 const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
-const SHOTS = ['home', 'poll', 'result']
 const SIZES = ['desktop', 'mobile']
+const SHOTS = ['card-open.png', 'card-result.png', ...['voted', 'home'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))]
 
 if (!process.env.CHROMIUM_PATH) {
   console.error('Set CHROMIUM_PATH to a Chromium or Chrome binary (no browser is downloaded).')
@@ -174,24 +177,35 @@ async function samplePhotos(page) {
 
 const allLoaded = (images) => images.evaluateAll((els) => els.every((el) => el.complete && el.naturalWidth > 0))
 
-async function run(browser, label, contextOptions) {
-  const context = await browser.newContext(contextOptions)
-  const page = await context.newPage()
-  // Viewport only, from the top of the page (or from an element), without the Next dev-mode badge.
-  const shot = async (name, { from } = {}) => {
-    await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
-    await page.evaluate(() => document.activeElement?.blur())
-    if (from) await from.evaluate((el) => el.scrollIntoView({ block: 'start' }))
-    else await page.evaluate(() => window.scrollTo(0, 0))
-    await page.screenshot({ path: `${outDir}${name}-${label}.png` })
-  }
-  const waitForImages = async (selector) => {
-    const images = page.locator(selector)
-    for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
-  }
+// Viewport only, from the top of the page (or from an element), without the Next dev-mode badge.
+async function shot(page, file, { from } = {}) {
+  await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
+  await page.evaluate(() => document.activeElement?.blur())
+  if (from) await from.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+  else await page.evaluate(() => window.scrollTo(0, 0))
+  await page.screenshot({ path: `${outDir}${file}` })
+}
 
-  // 1. The start page with a poll filled in and a photo picked for each option:
-  // the thumbnails show before anything is uploaded.
+async function waitForImages(page, selector) {
+  const images = page.locator(selector)
+  for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
+}
+
+/** A poll's share card, opened as an image (what a chat app or social site shows for the link). */
+async function shotOfCard(page, path, file) {
+  const res = await page.goto(`${base}${path}`)
+  if (res?.status() !== 200 || res.headers()['content-type'] !== 'image/png') {
+    throw new Error(`The card at ${path} answered ${res?.status()} ${res?.headers()['content-type']}`)
+  }
+  await page.screenshot({ path: `${outDir}${file}` })
+}
+
+async function run(browser, label, contextOptions) {
+  const desktop = label === 'desktop'
+
+  // 1. A seller posts a poll with a photo for each option (the main job).
+  const seller = await browser.newContext(contextOptions)
+  const page = await seller.newPage()
   await page.goto(base)
   await page.getByLabel('Option A text').waitFor()
   await page.getByLabel('Question').fill(QUESTION)
@@ -202,37 +216,45 @@ async function run(browser, label, contextOptions) {
   await page.getByLabel('Option A photo').setInputFiles({ name: 'speckled-blue-mug.jpg', mimeType: 'image/jpeg', buffer: photos.a })
   await page.getByLabel('Option B photo').setInputFiles({ name: 'white-mug-walnut.jpg', mimeType: 'image/jpeg', buffer: photos.b })
   await page.locator('img.thumb').nth(1).waitFor()
-  await waitForImages('img.thumb')
-  // On a phone the options sit below the intro, so the shot starts at the form.
-  await shot('home', label === 'mobile' ? { from: page.locator('form') } : {})
-
-  // 2. Post it (the core action): the photos upload, and the poll page shows both
-  // on the swipe card, served by tiebreak.
   await page.getByRole('button', { name: 'Create poll' }).click()
   await page.waitForURL(/\/p\/[^/?]+/)
   await page.getByText('Your poll is live').waitFor()
-  await waitForImages('.swipe-card img')
-  await shot('poll')
-
-  // 3. Two strangers vote; the creator swipes the last vote on the card, which
-  // closes the poll and shows its winner with the split.
   const id = new URL(page.url()).pathname.split('/').pop()
-  await strangerVotes(id, 0)
-  await strangerVotes(id, 1)
-  await page.goto(`${base}/p/${id}`)
-  await page.getByText(`2 of ${TARGET} votes`).waitFor()
-  await page.getByRole('button', { name: 'Pick A' }).click()
-  await page.getByText(/^Winner:/).waitFor()
-  await page.getByText(`Closed with ${TARGET} votes`).waitFor()
-  await waitForImages('.result img')
-  await shot('result')
 
-  await context.close()
+  // 2. What its link unfurls as: the poll's own card, the question and both photos.
+  if (desktop) await shotOfCard(page, `/p/${id}/card?v=open`, 'card-open.png')
+
+  // 3. A stranger opens the shared link (no cookie: a new anonymous account), picks
+  // one, and is offered a poll of their own.
+  const stranger = await browser.newContext(contextOptions)
+  const voter = await stranger.newPage()
+  await voter.goto(`${base}/p/${id}`)
+  await waitForImages(voter, '.swipe-card img')
+  await voter.getByRole('button', { name: 'Pick A' }).click()
+  const makeYourOwn = voter.getByRole('link', { name: 'Make your own tiebreak' })
+  await makeYourOwn.waitFor()
+  await shot(voter, `voted-${label}.png`)
+
+  // 4. The link opens the start page, tagged ?ref=poll for the visit counter.
+  await makeYourOwn.click()
+  await voter.waitForURL(`${base}/?ref=poll`)
+  await voter.getByLabel('Question').waitFor()
+  await shot(voter, `home-${label}.png`)
+
+  // 5. Two more strangers vote; the poll closes at 3, and its card shows the winner and the split.
+  if (desktop) {
+    await strangerVotes(id, 0)
+    await strangerVotes(id, 1)
+    await shotOfCard(page, `/p/${id}/card?v=closed`, 'card-result.png')
+  }
+
+  await stranger.close()
+  await seller.close()
 }
 
 /** This script owns docs/screenshots/: PNGs from older runs that it no longer takes go. */
 async function removeStaleShots() {
-  const current = new Set(SHOTS.flatMap((name) => SIZES.map((size) => `${name}-${size}.png`)))
+  const current = new Set(SHOTS)
   for (const file of await readdir(outDir)) {
     if (file.endsWith('.png') && !current.has(file)) await rm(`${outDir}${file}`)
   }
@@ -249,7 +271,7 @@ try {
   } finally {
     await browser.close()
   }
-  console.log(`Saved ${SHOTS.length * SIZES.length} screenshots to docs/screenshots/`)
+  console.log(`Saved ${SHOTS.length} screenshots to docs/screenshots/`)
 } finally {
   stopApp()
 }

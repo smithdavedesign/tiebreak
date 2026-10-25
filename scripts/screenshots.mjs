@@ -1,8 +1,11 @@
 // npm run screenshots: starts the app, drives the main job with Playwright at
-// desktop and phone size (pick a photo for each option, post the poll, see both
-// photos on the voting card, collect votes, read the result), saves PNGs to
-// docs/screenshots/ and stops the app. Not part of `npm test`. The sample photos
-// are drawn in the browser (two mugs), so no real photo is used.
+// desktop and phone size (pick a photo for each option, post the poll, a stranger
+// votes on the shared link and gets "Make your own tiebreak", more votes close it,
+// and the poll's share card shows the result), saves PNGs to docs/screenshots/ and
+// stops the app. On the way it checks what a link preview reads: the poll page's
+// og:image and twitter:image tags, and a 1200×630 PNG behind them. Not part of
+// `npm test`. The sample photos are drawn in the browser (two mugs), so no real
+// photo is used.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -23,7 +26,7 @@ const QUESTION = 'Which photo for my ceramic mug listing?'
 const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
-const SHOTS = ['home', 'poll', 'result']
+const SHOTS = ['home', 'voted', 'card']
 const SIZES = ['desktop', 'mobile']
 
 if (!process.env.CHROMIUM_PATH) {
@@ -174,17 +177,42 @@ async function samplePhotos(page) {
 
 const allLoaded = (images) => images.evaluateAll((els) => els.every((el) => el.complete && el.naturalWidth > 0))
 
+function check(ok, message) {
+  if (!ok) throw new Error(`Check failed: ${message}`)
+}
+
+/**
+ * What a chat app's link preview reads: the poll page's head as a preview bot gets it, with og:image and
+ * twitter:image naming the poll's card, which must be a 1200×630 PNG. Returns the card's path.
+ */
+async function checkShareTags(id, status) {
+  const html = await (await fetch(`${base}/p/${id}`, { headers: { 'user-agent': 'Twitterbot/1.0' } })).text()
+  const meta = (attr, name) => html.match(new RegExp(`<meta ${attr}="${name}" content="([^"]+)"`))?.[1]
+  const og = meta('property', 'og:image')
+  const twitter = meta('name', 'twitter:image')
+  check(meta('name', 'twitter:card') === 'summary_large_image', 'twitter:card is summary_large_image')
+  check(og && og === twitter, `og:image and twitter:image name the same card (${og}, ${twitter})`)
+  const card = new URL(og)
+  check(card.pathname + card.search === `/p/${id}/card?v=${status}`, `the card is the poll's own (${og})`)
+  const res = await fetch(`${base}${card.pathname}${card.search}`)
+  const png = Buffer.from(await res.arrayBuffer())
+  check(res.status === 200 && res.headers.get('content-type') === 'image/png', 'the card answers image/png')
+  check(png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630, 'the card is 1200×630')
+  return card.pathname + card.search
+}
+
 async function run(browser, label, contextOptions) {
   const context = await browser.newContext(contextOptions)
   const page = await context.newPage()
   // Viewport only, from the top of the page (or from an element), without the Next dev-mode badge.
-  const shot = async (name, { from } = {}) => {
+  const shotOf = (page) => async (name, { from } = {}) => {
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
     await page.evaluate(() => document.activeElement?.blur())
     if (from) await from.evaluate((el) => el.scrollIntoView({ block: 'start' }))
     else await page.evaluate(() => window.scrollTo(0, 0))
     await page.screenshot({ path: `${outDir}${name}-${label}.png` })
   }
+  const shot = shotOf(page)
   const waitForImages = async (selector) => {
     const images = page.locator(selector)
     for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
@@ -207,25 +235,40 @@ async function run(browser, label, contextOptions) {
   await shot('home', label === 'mobile' ? { from: page.locator('form') } : {})
 
   // 2. Post it (the core action): the photos upload, and the poll page shows both
-  // on the swipe card, served by tiebreak.
+  // on the swipe card, served by tiebreak. Its link unfurls as the poll's own card.
   await page.getByRole('button', { name: 'Create poll' }).click()
   await page.waitForURL(/\/p\/[^/?]+/)
   await page.getByText('Your poll is live').waitFor()
   await waitForImages('.swipe-card img')
-  await shot('poll')
-
-  // 3. Two strangers vote; the creator swipes the last vote on the card, which
-  // closes the poll and shows its winner with the split.
   const id = new URL(page.url()).pathname.split('/').pop()
-  await strangerVotes(id, 0)
+  await checkShareTags(id, 'open')
+
+  // 3. A stranger opens the shared link (their own browser) and picks A on the card:
+  // the page confirms the vote and offers "Make your own tiebreak", which goes to
+  // the start page tagged ?ref=poll.
+  const voterContext = await browser.newContext(contextOptions)
+  const voterPage = await voterContext.newPage()
+  await voterPage.goto(`${base}/p/${id}`)
+  await voterPage.getByRole('button', { name: 'Pick A' }).click()
+  await voterPage.getByText('You picked').waitFor()
+  const makeYourOwn = voterPage.getByRole('link', { name: 'Make your own tiebreak' })
+  await makeYourOwn.waitFor()
+  for (let i = 0; i < 100 && !(await allLoaded(voterPage.locator('img'))); i++) await voterPage.waitForTimeout(100)
+  await shotOf(voterPage)('voted')
+  await makeYourOwn.click()
+  await voterPage.waitForURL(`${base}/?ref=poll`)
+  await voterPage.getByLabel('Option A text').waitFor()
+  await voterContext.close()
+
+  // 4. Two more strangers vote, which closes the poll (A wins 2 to 1). The page's
+  // share tags move to the closed card, which marks the winner and the split.
   await strangerVotes(id, 1)
-  await page.goto(`${base}/p/${id}`)
-  await page.getByText(`2 of ${TARGET} votes`).waitFor()
-  await page.getByRole('button', { name: 'Pick A' }).click()
-  await page.getByText(/^Winner:/).waitFor()
-  await page.getByText(`Closed with ${TARGET} votes`).waitFor()
-  await waitForImages('.result img')
-  await shot('result')
+  await strangerVotes(id, 0)
+  const cardPath = await checkShareTags(id, 'closed')
+  await page.goto(`${base}${cardPath}`)
+  await page.locator('img').waitFor()
+  await waitForImages('img')
+  await page.screenshot({ path: `${outDir}card-${label}.png` })
 
   await context.close()
 }

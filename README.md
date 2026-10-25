@@ -2,20 +2,20 @@
 
 ## Screenshots
 
-![Start page with a photo picked for each option, thumbnails showing, desktop](docs/screenshots/home-desktop.png)
-![Start page with a photo picked for each option, thumbnails showing, phone](docs/screenshots/home-mobile.png)
+![Start page with a question, two options and a photo picked for each, desktop](docs/screenshots/home-desktop.png)
+![Start page with a question, two options and a photo picked for each, phone](docs/screenshots/home-mobile.png)
 
-The core action, posting a poll, now with photos: each option has "Upload a photo" (JPEG, PNG or WebP, up to 5 MB), and the picked photo shows as a thumbnail in its option before anything is sent.
+The core action, posting a poll: a question and two options, each with a photo picked from the device.
 
-![The new poll's swipe card with both uploaded photos, desktop](docs/screenshots/poll-desktop.png)
-![The new poll's swipe card with both uploaded photos, phone](docs/screenshots/poll-mobile.png)
+![A stranger's view of the shared poll after voting, with "Make your own tiebreak", desktop](docs/screenshots/voted-desktop.png)
+![A stranger's view of the shared poll after voting, with "Make your own tiebreak", phone](docs/screenshots/voted-mobile.png)
 
-The poll it posted: both photos were uploaded with the poll and now load from tiebreak itself, on the card people swipe.
+New: a stranger opened the shared link in their own browser and picked A. Below their vote, "Make your own tiebreak" goes to the start page as `/?ref=poll` (the script follows it).
 
-![Closed poll with the winning photo and the vote split, desktop](docs/screenshots/result-desktop.png)
-![Closed poll with the winning photo and the vote split, phone](docs/screenshots/result-mobile.png)
+![The closed poll's share card: both photos, the winner marked and the 2-to-1 split, desktop](docs/screenshots/card-desktop.png)
+![The same share card on a phone](docs/screenshots/card-mobile.png)
 
-Its result: two strangers voted on the shared link, the creator swiped the third vote, and the poll closed with the winning photo and the split (2 to 1).
+New: the poll's own share card, the 1200×630 PNG at `/p/<id>/card` that its link now unfurls as. Two more strangers voted, the poll closed, and the card marks the winning photo with each option's votes and share. The script also checks that the poll page's `og:image` and `twitter:image` (`summary_large_image`) name this card.
 
 Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two mug photos are drawn in the browser).
 

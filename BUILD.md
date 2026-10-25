@@ -529,6 +529,9 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - **Private polls, for anyone but the creator.** Once closed, the page says "This poll has closed. Its creator keeps the result private." It shows your own vote but no winner or split. While open, after you vote, the page says the result is private.
     - **The creator** sees the full result, as with any poll. A new private poll's banner says "Only you will see the result".
     - **CSV.** On a closed poll, a Pro creator gets **Download votes (CSV)**. A free creator gets "Get Pro to download every vote as a CSV". Nobody else sees either.
+  - **New (growth, 2026-10-25):**
+    - once you've voted, or once the poll has closed, everyone but the creator sees **Make your own tiebreak**, a link to `/?ref=poll`;
+    - the link unfurls as the poll's own share card (`og:image` and `twitter:image`, see `GET /p/:id/card` below; GROWTH.md has the details).
 - **JSON API.** Paths match the roadmap exactly, with no `/api` prefix.
   - `GET /polls` → `200 {polls}`: the feed as the caller sees it (at most 20, `no-store`, tally hidden).
   - `POST /polls` `{question?, options, target, durationHours, visibility?: "unlisted" | "public" | "private"}` → `201 {id, shareUrl, poll}`, or:
@@ -543,6 +546,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - `POST /images`, body: the photo's bytes with an `image/*` type → `201 {id, url}`, or `400` (empty), `413` (over 5 MB), `415` (not image/*, or the bytes aren't a JPEG, PNG or WebP), `422` (over 64 megapixels) and `503` (photo storage full). The account cookie is set if missing.
       - The photo is checked by its bytes and cleaned before it's stored (`lib/images.ts`): JPEG EXIF (GPS, camera), XMP, IPTC, comments and extra pictures go, and the orientation comes back as a one-tag EXIF; PNG and WebP keep only the chunks that draw the image.
     - `GET /images/:id` → `200` the photo (its checked type, `nosniff`, `public, max-age=86400, s-maxage=86400, immutable`), or `404` (`no-store`) until a poll uses it.
+  - **New with share cards (growth, 2026-10-25):** `GET /p/:id/card?v=<status>` → `200` the poll's 1200×630 PNG share card, cached 10 minutes while open and a day once closed. Any other query gets a `307` to that address (cached a minute), and an unknown poll a `404` (`no-store`). It shows the question and every option, and once closed the winner and split, never a private poll's. It sits under `/p`, not `/polls`, because robots.txt disallows `/polls`.
   - `GET /polls/:id` → `200 {poll}`, closing the poll first if it's past its deadline; or `404`.
   - `POST /polls/:id/votes` `{option}` → `201 {poll, account}`, or 400/404/409/410/415.
   - `POST /polls/:id/reports` `{}` → `201 {reported: true}`, or 400/404, 409 (already reported) and 415.

@@ -442,6 +442,18 @@ button.danger {
   margin-top: 1rem;
 }
 
+.make-own {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 0.8rem 1rem 1rem;
+  margin: 1rem 0;
+}
+
+.make-own p {
+  margin: 0 0 0.7rem;
+}
+
 .terms h2 {
   font-size: 1.1rem;
   margin: 1.5rem 0 0.25rem;

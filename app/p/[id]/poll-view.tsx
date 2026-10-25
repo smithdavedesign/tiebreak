@@ -104,6 +104,7 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
       )}
       {!open && (resultHidden ? <PrivateResult poll={poll} /> : <Result poll={poll} />)}
       {!open && poll.mine && <Export id={poll.id} plan={plan} />}
+      {!poll.mine && (poll.myVote !== null || !open) && <MakeYourOwn />}
 
       {notice && (
         <p className="notice" role="status">
@@ -187,6 +188,22 @@ function PrivateResult({ poll }: { poll: Poll }) {
       <h2>This poll has closed.</h2>
       <p>Its creator keeps the result private. Thanks for voting!</p>
       {poll.myVote !== null && <p className="hint">You voted {LETTERS[poll.myVote]}.</p>}
+    </div>
+  )
+}
+
+/**
+ * The loop back to the start page, for voters (and anyone who arrives once the poll has closed): each of
+ * them may have a choice of their own to make. A plain <a>, not <Link>: the full page load lets the
+ * layout's visit beacon count the visit with its ?ref=poll tag.
+ */
+function MakeYourOwn() {
+  return (
+    <div className="make-own">
+      <p>Stuck choosing between photos, titles or anything else? Post 2–4 options and share the link, like this one. Link-only polls are free.</p>
+      <a className="button" href="/?ref=poll">
+        Make your own tiebreak
+      </a>
     </div>
   )
 }

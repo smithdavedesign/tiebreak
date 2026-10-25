@@ -4,10 +4,14 @@ import { notFound } from 'next/navigation'
 import { VOTER_COOKIE, isVoterId } from '@/lib/http'
 import { getPlan } from '@/lib/plans'
 import { getPoll } from '@/lib/polls'
+import { cardImage } from '@/lib/share-card'
 import { SHARE_IMAGE, SITE_NAME } from '@/lib/site'
 import { PollView } from './poll-view'
 
-/** A poll's own title on its share card; kept out of search (it's someone's link, not a page to find). */
+/**
+ * A poll's own title and card (its question and options, drawn at /p/:id/card) where the link is shared;
+ * kept out of search (it's someone's link, not a page to find).
+ */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const poll = await getPoll(id, null).catch(() => null)
@@ -15,13 +19,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const description = poll
     ? `Swipe to vote: ${poll.options.map((o, i) => o.text || `option ${'ABCD'[i]}`).join(' or ')}.`
     : undefined
+  const image = poll ? cardImage(poll) : SHARE_IMAGE
   return {
     title,
     description,
     robots: { index: false, follow: false },
-    // Replaces the layout's share tags wholesale, so the site name and image go in again.
-    openGraph: { type: 'website', siteName: SITE_NAME, url: `/p/${id}`, title, description, images: [SHARE_IMAGE] },
-    twitter: { card: 'summary_large_image', title, description },
+    // Replaces the layout's share tags wholesale, so the site name goes in again.
+    openGraph: { type: 'website', siteName: SITE_NAME, url: `/p/${id}`, title, description, images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
   }
 }
 

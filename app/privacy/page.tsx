@@ -50,18 +50,21 @@ export default function PrivacyPage() {
         Our own counter (RepoHQ) gets three anonymous events: a &ldquo;visit&rdquo; (the first page you open in a browser
         session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
         (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
-        your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
-        with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
-        automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting
-        you twice, your browser keeps two small flags in its own storage; they never leave your device. There are no
-        third-party analytics, ad trackers or pixels.
+        your browser shares it. A visit can also carry the short tag on a link of ours you followed, such as
+        &ldquo;poll&rdquo; from a poll&apos;s &ldquo;Make your own tiebreak&rdquo; link. No cookie is set and no id is
+        sent. The counter stores a one-way hash of your IP address with the event, never the address itself, so it can
+        limit spam to a few counts an hour. Nothing is sent from automated browsers, or if you set{' '}
+        <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting you twice, your browser keeps a
+        few small flags in its own storage; they never leave your device. There are no third-party analytics, ad trackers
+        or pixels.
       </p>
 
       <h2>Who else sees anything</h2>
       <p>
         Stripe, if you pay. Our hosts, Vercel (the website) and Neon (the database), run the service. Uploaded photos load
         from tiebreak itself. Option images given as links load straight from those links, so those sites see the
-        request. Nothing is sold or shared for ads.
+        request; tiebreak&apos;s server also fetches them to draw the poll&apos;s preview card for wherever its link is
+        shared. Nothing is sold or shared for ads.
       </p>
 
       <h2>Contact</h2>

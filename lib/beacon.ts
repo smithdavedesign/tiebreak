@@ -31,24 +31,41 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
   }
 }
 
+const REF_PATTERN = /^[a-z0-9_-]{1,32}$/
+
 /**
- * Fire-and-forget funnel event. visit: once per browser session (sessionStorage); activate: once per
- * browser (localStorage); checkout: every Buy click. No cookies. Sent as text/plain so the browser needs
- * no CORS preflight; the endpoint parses the JSON body. If storage is unavailable, nothing is sent
- * rather than repeating a once-only event.
+ * The ?ref tag on the page's URL, lower-cased, or null. Our own links set it (the poll page's "Make your
+ * own tiebreak" goes to /?ref=poll), so a visit says which link it came through even from the same site,
+ * where there's no referrer to send. Anything but a short plain tag is ignored.
+ */
+export function refFor(search: string): string | null {
+  const ref = new URLSearchParams(search).get('ref')?.toLowerCase() ?? ''
+  return REF_PATTERN.test(ref) ? ref : null
+}
+
+/**
+ * Fire-and-forget funnel event. visit: once per browser session (sessionStorage), plus once per ?ref tag
+ * the session lands on; activate: once per browser (localStorage); checkout: every Buy click. No cookies.
+ * Sent as text/plain so the browser needs no CORS preflight; the endpoint parses the JSON body. If
+ * storage is unavailable, nothing is sent rather than repeating a once-only event.
  */
 export function sendSignal(kind: SignalKind): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
     if (!shouldSend({ vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV, webdriver: navigator.webdriver === true, optedOut })) return
+    const ref = kind === 'visit' ? refFor(location.search ?? '') : null
     if (kind === 'visit') {
-      if (sessionStorage.getItem(VISITED_KEY)) return
+      // A voter's first page already counted the session, so a tagged visit has a flag of its own.
+      const key = ref === null ? VISITED_KEY : `${VISITED_KEY}:${ref}`
+      if (sessionStorage.getItem(key)) return
+      sessionStorage.setItem(key, '1')
       sessionStorage.setItem(VISITED_KEY, '1')
     } else if (kind === 'activate') {
       if (localStorage.getItem(ACTIVATED_KEY)) return
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer: referrerFor(document.referrer, location.origin) })
+    const referrer = referrerFor(document.referrer, location.origin)
+    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer, ...(ref === null ? {} : { ref }) })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

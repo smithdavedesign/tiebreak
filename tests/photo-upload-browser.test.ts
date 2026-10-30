@@ -6,42 +6,17 @@
 // posted. Image links still work next to photos.
 //
 // Needs CHROMIUM_PATH (a Chromium or Chrome binary; no browser is downloaded), and is
-// skipped without it. The app never sees a real database or Stripe setting from this
-// shell: those variables are dropped, as in scripts/screenshots.mjs.
-import { spawn, type ChildProcess } from 'node:child_process'
-import { once } from 'node:events'
-import { createServer, type AddressInfo } from 'node:net'
-import { fileURLToPath } from 'node:url'
+// skipped without it. The dev server is the browser tests' shared one (tests/browser-app.ts),
+// which never sees a real database or Stripe setting from this shell.
 import { chromium, devices, type Browser, type Locator, type Page } from 'playwright-core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest'
 import { MAX_IMAGE_BYTES } from '@/lib/limits'
+import { appReady } from './browser-app'
 import { png } from './image-bytes'
 
 const CHROMIUM = process.env.CHROMIUM_PATH
 const PHONE = devices['iPhone 13']
 const ACCEPT = 'image/jpeg,image/png,image/webp'
-const root = fileURLToPath(new URL('..', import.meta.url))
-
-async function freePort() {
-  const server = createServer().listen(0)
-  await once(server, 'listening')
-  const { port } = server.address() as AddressInfo
-  server.close()
-  await once(server, 'close')
-  return port
-}
-
-async function waitForApp(base: string, app: ChildProcess) {
-  const deadline = Date.now() + 180_000
-  while (Date.now() < deadline) {
-    if (app.exitCode !== null) throw new Error('The dev server exited before it answered.')
-    try {
-      if ((await fetch(base)).ok) return
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-  }
-  throw new Error(`The dev server did not answer on ${base}`)
-}
 
 /** A real photo from the browser's own encoder: a two-colour picture as JPEG or WebP bytes. */
 async function encode(page: Page, type: 'image/jpeg' | 'image/webp', colour: string) {
@@ -69,32 +44,11 @@ const loaded = (img: Locator) => img.evaluate((el) => (el as HTMLImageElement).c
 const isPath = (url: string, path: string) => new URL(url).pathname === path
 
 describe.skipIf(!CHROMIUM)('photo upload in Chromium at phone width (390 px)', () => {
-  let app: ChildProcess | undefined
   let browser: Browser | undefined
-  let base = ''
+  const base = inject('appBase')
 
   beforeAll(async () => {
-    const port = await freePort()
-    base = `http://localhost:${port}`
-    // Sample data only: no real database, no Stripe, no visit beacon; and not vitest's NODE_ENV.
-    const env: NodeJS.ProcessEnv = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', HOUSE_POLLS: 'off' }
-    for (const name of Object.keys(env)) {
-      const drop =
-        name === 'DATABASE_URL' ||
-        name === 'NODE_ENV' ||
-        name.startsWith('STRIPE_') ||
-        name.startsWith('VITEST') ||
-        name.endsWith('VERCEL_ENV')
-      if (drop) delete env[name]
-    }
-    const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port)], {
-      cwd: root,
-      detached: true,
-      stdio: 'ignore',
-      env,
-    })
-    app = server
-    await waitForApp(base, server)
+    await appReady(base)
     // The dev server compiles each route on its first request; do that now, not inside a test's timeout.
     await Promise.all([
       fetch(`${base}/images`, { method: 'POST', headers: { 'content-type': 'image/png' }, body: png() }),
@@ -107,9 +61,6 @@ describe.skipIf(!CHROMIUM)('photo upload in Chromium at phone width (390 px)', (
 
   afterAll(async () => {
     await browser?.close()
-    try {
-      if (app?.pid) process.kill(-app.pid, 'SIGTERM')
-    } catch {}
   })
 
   /** A phone-sized page on the start page, without the Next dev-mode badge over the form. */

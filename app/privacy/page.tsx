@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ISSUES_URL, pageMetadata } from '@/lib/site'
+import { ETSY_PHOTO_TEST_PATH, ISSUES_URL, pageMetadata } from '@/lib/site'
 
 export const metadata = pageMetadata(
   '/privacy',
@@ -28,7 +28,9 @@ export default function PrivacyPage() {
         <li>
           Photos you upload for an option, kept in our database. We remove location, camera and other hidden details from
           the file first. Anyone with the poll&apos;s link sees them (and the public feed, if you post it there). A photo
-          no poll uses is deleted after a day, and deleting a poll deletes its photos.
+          no poll uses is deleted after a day, and deleting a poll deletes its photos. Photos you only try out in the{' '}
+          <Link href={ETSY_PHOTO_TEST_PATH}>Etsy listing photo test</Link> stay in your browser; they&apos;re uploaded
+          only if you create a poll with them.
         </li>
         <li>Your votes and reports, with the time. Creators can download the votes on their own polls (time and option, never who voted).</li>
         <li>
@@ -50,7 +52,8 @@ export default function PrivacyPage() {
         Our own counter (RepoHQ) gets three anonymous events: a &ldquo;visit&rdquo; (the first page you open in a browser
         session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
         (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
-        your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
+        your browser shares it. A visit that starts on the Etsy listing photo test also names that page (
+        <code>{ETSY_PHOTO_TEST_PATH}</code>), so its visits are counted apart. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
         with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
         automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting
         you twice, your browser keeps two small flags in its own storage; they never leave your device. There are no

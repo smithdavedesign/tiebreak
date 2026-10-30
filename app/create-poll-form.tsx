@@ -17,6 +17,7 @@ import {
   OPTION_LETTERS as LETTERS,
 } from '@/lib/limits'
 import type { Plan } from '@/lib/plans'
+import { clearPendingPoll, pendingPoll } from '@/lib/poll-handoff'
 
 const DURATIONS = [
   { hours: 1, label: '1 hour' },
@@ -53,8 +54,13 @@ function uploadError(status: number, body: { error?: unknown } | null) {
 
 export function CreatePollForm({ account, plan }: { account: AccountView; plan: Plan }) {
   const router = useRouter()
-  const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState<Draft[]>([blank(), blank()])
+  // Photos handed over by the Etsy photo test (lib/poll-handoff.ts): read as the form opens, then cleared.
+  const [prefill] = useState(pendingPoll)
+  useEffect(() => clearPendingPoll(), [])
+  const [question, setQuestion] = useState(prefill?.question ?? '')
+  const [options, setOptions] = useState<Draft[]>(() =>
+    prefill ? prefill.photos.map((photo) => ({ ...blank(), photo })) : [blank(), blank()],
+  )
   const [target, setTarget] = useState(String(DEFAULT_TARGET))
   const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [isPublic, setIsPublic] = useState(false)
@@ -135,6 +141,12 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
 
   return (
     <form className="card create" onSubmit={submit}>
+      {prefill && (
+        <p className="notice">
+          Your {prefill.photos.length} photos are options A–{LETTERS[prefill.photos.length - 1]} below. They upload
+          when you create the poll.
+        </p>
+      )}
       <label>
         Question <span className="hint">(optional)</span>
         <input

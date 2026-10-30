@@ -470,3 +470,166 @@ button.danger {
 .guide-cta p {
   margin: 0;
 }
+
+/* The Etsy listing photo test: a wider page for the grid, the drop zone, the mock search grid and its tiles */
+main:has(.photo-test-page) {
+  max-width: 56rem;
+}
+
+.photo-test-page > :not(.photo-test) {
+  max-width: 40rem;
+}
+
+label.photo-drop {
+  position: relative;
+  justify-items: center;
+  gap: 0.4rem;
+  margin: 1rem 0;
+  padding: 1.2rem 1rem;
+  border: 2px dashed var(--line);
+  border-radius: 1rem;
+  background: var(--card);
+  text-align: center;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.photo-drop .pick {
+  border-radius: 0.7rem;
+  padding: 0.6rem 1.1rem;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+}
+
+.photo-drop:focus-within .pick {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.photo-drop:has(input:disabled) {
+  cursor: default;
+}
+
+.photo-drop:has(input:disabled) .pick {
+  opacity: 0.5;
+}
+
+.skipped {
+  padding-left: 1.2rem;
+}
+
+.etsy-grid {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 0.75rem;
+}
+
+@media (min-width: 48rem) {
+  .etsy-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.5rem 1rem;
+  }
+}
+
+.etsy-tile {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.etsy-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  background: #e9e7e2;
+  display: grid;
+  place-items: center;
+}
+
+/* Out of the flow, so the photo's own height can't stretch the square: it's cropped to fill it instead. */
+.etsy-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.etsy-thumb .photo-name {
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.etsy-letter {
+  position: absolute;
+  left: 0.4rem;
+  top: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.4rem;
+  background: rgba(29, 29, 31, 0.8);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+button.etsy-remove {
+  position: absolute;
+  right: 0.4rem;
+  top: 0.4rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.etsy-line {
+  display: block;
+  height: 0.55rem;
+  border-radius: 0.3rem;
+  background: #e3e1dc;
+}
+
+.etsy-line.title {
+  width: 95%;
+}
+
+.etsy-line.title.short {
+  width: 70%;
+}
+
+.etsy-line.shop {
+  width: 45%;
+}
+
+.etsy-line.price {
+  width: 30%;
+  height: 0.75rem;
+  background: #c9c6bf;
+}
+
+.etsy-tile.other .etsy-thumb {
+  background: #efeee9;
+}
+
+.photo-test-go {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.photo-test-go p {
+  margin: 0;
+}

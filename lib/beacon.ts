@@ -1,4 +1,4 @@
-import { SIGNAL_URL } from '@/lib/site'
+import { ETSY_PHOTO_TEST_PATH, SIGNAL_URL } from '@/lib/site'
 
 /** The three funnel events tiebreak sends to RepoHQ (named on the privacy page). */
 export type SignalKind = 'visit' | 'activate' | 'checkout'
@@ -31,13 +31,22 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
   }
 }
 
+/** Pages whose visits carry their path. Every other page's visit (the search pages' too) has none, so these count apart. */
+const COUNTED_APART: readonly string[] = [ETSY_PHOTO_TEST_PATH]
+
+/** The `path` a visit landing on this page carries: the page itself if it's counted apart, else none. */
+export function visitPath(pathname: string): string | undefined {
+  return COUNTED_APART.includes(pathname) ? pathname : undefined
+}
+
 /**
  * Fire-and-forget funnel event. visit: once per browser session (sessionStorage); activate: once per
  * browser (localStorage); checkout: every Buy click. No cookies. Sent as text/plain so the browser needs
  * no CORS preflight; the endpoint parses the JSON body. If storage is unavailable, nothing is sent
- * rather than repeating a once-only event.
+ * rather than repeating a once-only event. `path` (visits only, from visitPath) names the page the
+ * session landed on; without it the body is as before.
  */
-export function sendSignal(kind: SignalKind): void {
+export function sendSignal(kind: SignalKind, path?: string): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
     if (!shouldSend({ vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV, webdriver: navigator.webdriver === true, optedOut })) return
@@ -48,7 +57,8 @@ export function sendSignal(kind: SignalKind): void {
       if (localStorage.getItem(ACTIVATED_KEY)) return
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer: referrerFor(document.referrer, location.origin) })
+    const referrer = referrerFor(document.referrer, location.origin)
+    const body = JSON.stringify(path ? { slug: 'tiebreak', kind, referrer, path } : { slug: 'tiebreak', kind, referrer })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

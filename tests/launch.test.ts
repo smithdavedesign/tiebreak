@@ -29,6 +29,7 @@ const terms = await import('@/app/terms/page')
 const pickfu = await import('@/app/pickfu-alternative/page')
 const etsy = await import('@/app/which-etsy-photo-is-best/page')
 const thumbnail = await import('@/app/choose-a-thumbnail-or-book-cover/page')
+const etsyPhotoTest = await import('@/app/tools/etsy-listing-photo-test/page')
 
 useTestDb()
 
@@ -42,6 +43,7 @@ const PAGES: Record<(typeof PUBLIC_PAGES)[number], { metadata: Metadata; render:
   '/pickfu-alternative': { metadata: pickfu.metadata, render: () => pickfu.default() },
   '/which-etsy-photo-is-best': { metadata: etsy.metadata, render: () => etsy.default() },
   '/choose-a-thumbnail-or-book-cover': { metadata: thumbnail.metadata, render: () => thumbnail.default() },
+  '/tools/etsy-listing-photo-test': { metadata: etsyPhotoTest.metadata, render: () => etsyPhotoTest.default() },
 }
 const entries = Object.entries(PAGES)
 

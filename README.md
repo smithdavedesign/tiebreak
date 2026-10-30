@@ -2,22 +2,22 @@
 
 ## Screenshots
 
-![Start page with a photo picked for each option, thumbnails showing, desktop](docs/screenshots/home-desktop.png)
-![Start page with a photo picked for each option, thumbnails showing, phone](docs/screenshots/home-mobile.png)
+![The Etsy listing photo test with three mug photos as square tiles in the mock Etsy search grid, desktop](docs/screenshots/tool-desktop.png)
+![The same three photos two to a row in the mock grid, with "Let strangers pick", phone](docs/screenshots/tool-mobile.png)
 
-The core action, posting a poll, now with photos: each option has "Upload a photo" (JPEG, PNG or WebP, up to 5 MB), and the picked photo shows as a thumbnail in its option before anything is sent.
+The free Etsy listing photo test (`/tools/etsy-listing-photo-test`): three candidate photos of one mug, shot wide, tall and square, each cropped to a square tile side by side in a mock Etsy search grid. Nothing has been uploaded yet.
 
-![The new poll's swipe card with both uploaded photos, desktop](docs/screenshots/poll-desktop.png)
-![The new poll's swipe card with both uploaded photos, phone](docs/screenshots/poll-mobile.png)
+![The new-poll form opened by "Let strangers pick", with the three photos as options A–C, desktop](docs/screenshots/form-desktop.png)
+![The same form on a phone, with the question filled in and the photos still on the device](docs/screenshots/form-mobile.png)
 
-The poll it posted: both photos were uploaded with the poll and now load from tiebreak itself, on the card people swipe.
+"Let strangers pick" opens the existing new-poll form with the three photos as options A–C and the question "Which photo would you click in Etsy search?". They upload only when the poll is created.
 
-![Closed poll with the winning photo and the vote split, desktop](docs/screenshots/result-desktop.png)
-![Closed poll with the winning photo and the vote split, phone](docs/screenshots/result-mobile.png)
+![The posted poll with all three photos to vote on, desktop](docs/screenshots/poll-desktop.png)
+![The posted poll with all three photos to vote on, phone](docs/screenshots/poll-mobile.png)
 
-Its result: two strangers voted on the shared link, the creator swiped the third vote, and the poll closed with the winning photo and the split (2 to 1).
+The poll it created: all three photos, served by tiebreak, ready for votes on the share link.
 
-Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two mug photos are drawn in the browser).
+Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the three mug photos are drawn in the browser).
 
 People post two options, strangers swipe to pick one, and the poll closes at a vote target or deadline; sellers and creators pay a few dollars for a fast verdict instead of PickFu's $15+.
 

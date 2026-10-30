@@ -1,8 +1,9 @@
-// npm run screenshots: starts the app, drives the main job with Playwright at
-// desktop and phone size (pick a photo for each option, post the poll, see both
-// photos on the voting card, collect votes, read the result), saves PNGs to
-// docs/screenshots/ and stops the app. Not part of `npm test`. The sample photos
-// are drawn in the browser (two mugs), so no real photo is used.
+// npm run screenshots: starts the app, drives the Etsy listing photo test with
+// Playwright at desktop and phone size (add three listing photos to the mock Etsy
+// search grid, "Let strangers pick" into the new-poll form, post the poll, see all
+// three photos on its page), saves PNGs to docs/screenshots/ and stops the app. Not
+// part of `npm test`. The sample photos are drawn in the browser (three mugs), so
+// no real photo is used.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -19,11 +20,8 @@ const outDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url))
 const port = Number(process.env.SCREENSHOT_PORT ?? 3187)
 const base = `http://localhost:${port}`
 
-const QUESTION = 'Which photo for my ceramic mug listing?'
-const OPTION_A = 'Speckled blue glaze, morning light'
-const OPTION_B = 'Matte white on a walnut shelf'
-const TARGET = 3
-const SHOTS = ['home', 'poll', 'result']
+const TOOL = '/tools/etsy-listing-photo-test'
+const SHOTS = ['tool', 'form', 'poll']
 const SIZES = ['desktop', 'mobile']
 
 if (!process.env.CHROMIUM_PATH) {
@@ -67,44 +65,38 @@ async function waitForApp() {
   throw new Error('The dev server did not answer on ' + base)
 }
 
-/** A stranger's vote: no cookie, so the app mints them a fresh anonymous account. */
-async function strangerVotes(id, option) {
-  const res = await fetch(`${base}/polls/${id}/votes`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ option }),
-  })
-  if (res.status !== 201) throw new Error(`Stranger vote failed: ${res.status}`)
-}
-
 /**
- * Two sample product photos, drawn on a canvas in the page and encoded as JPEG the
- * way a phone's photo would arrive: a speckled blue mug in morning light, and a
- * matte white mug on a walnut shelf.
+ * Three candidate listing photos of one mug, drawn on a canvas in the page and
+ * encoded as JPEG the way a phone's photo would arrive, in three shapes so the
+ * square crop shows: wide (morning light), tall (walnut shelf) and square (linen).
  */
 async function samplePhotos(page) {
   const encoded = await page.evaluate(async () => {
     const draw = (scene) => {
       const size = 900
       const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
+      canvas.width = scene.width
+      canvas.height = scene.height
       const ctx = canvas.getContext('2d')
-      const wall = ctx.createLinearGradient(0, 0, size, size)
+      const wall = ctx.createLinearGradient(0, 0, scene.width, scene.height)
       wall.addColorStop(0, scene.wall[0])
       wall.addColorStop(1, scene.wall[1])
       ctx.fillStyle = wall
-      ctx.fillRect(0, 0, size, size)
-      // The surface the mug stands on.
+      ctx.fillRect(0, 0, scene.width, scene.height)
+      // The mug is drawn in a 900 × 900 square in the middle of the picture.
+      const dx = (scene.width - size) / 2
+      const dy = (scene.height - size) / 2
+      ctx.translate(dx, dy)
+      // The surface the mug stands on, to the picture's edges.
       ctx.fillStyle = scene.surface
-      ctx.fillRect(0, 640, size, 260)
+      ctx.fillRect(-dx, 640, scene.width, scene.height)
       if (scene.grain) {
         ctx.strokeStyle = 'rgba(30, 15, 5, 0.35)'
         ctx.lineWidth = 3
-        for (let y = 660; y < size; y += 26) {
+        for (let y = 660; y < size + dy; y += 26) {
           ctx.beginPath()
-          ctx.moveTo(0, y)
-          ctx.bezierCurveTo(300, y - 12, 600, y + 14, size, y - 4)
+          ctx.moveTo(-dx, y)
+          ctx.bezierCurveTo(300, y - 12, 600, y + 14, size + dx, y - 4)
           ctx.stroke()
         }
       }
@@ -153,23 +145,38 @@ async function samplePhotos(page) {
       for (const byte of new Uint8Array(await blob.arrayBuffer())) binary += String.fromCharCode(byte)
       return btoa(binary)
     }
-    const blue = await draw({
+    const wide = await draw({
+      width: 1600,
+      height: 1000,
       wall: ['#fff3dc', '#f4d9b0'],
       surface: '#efe6da',
       mug: ['#4f86d9', '#1f4f9e'],
       rim: '#183f80',
       speckles: true,
     })
-    const white = await draw({
+    const tall = await draw({
+      width: 900,
+      height: 1300,
       wall: ['#e7e3dc', '#cfc8bd'],
       surface: '#6b4325',
       grain: true,
-      mug: ['#fbfaf7', '#d9d5cd'],
-      rim: '#c9c4ba',
+      mug: ['#4f86d9', '#1f4f9e'],
+      rim: '#183f80',
+      speckles: true,
     })
-    return { a: await toBase64(blue), b: await toBase64(white) }
+    const square = await draw({
+      width: 1000,
+      height: 1000,
+      wall: ['#f3f1ec', '#e2ddd3'],
+      surface: '#d8cbb3',
+      mug: ['#4f86d9', '#1f4f9e'],
+      rim: '#183f80',
+      speckles: true,
+    })
+    return Promise.all([wide, tall, square].map(toBase64))
   })
-  return { a: Buffer.from(encoded.a, 'base64'), b: Buffer.from(encoded.b, 'base64') }
+  const names = ['blue-mug-morning-light.jpg', 'blue-mug-walnut-shelf.jpg', 'blue-mug-linen.jpg']
+  return encoded.map((base64, i) => ({ name: names[i], mimeType: 'image/jpeg', buffer: Buffer.from(base64, 'base64') }))
 }
 
 const allLoaded = (images) => images.evaluateAll((els) => els.every((el) => el.complete && el.naturalWidth > 0))
@@ -190,42 +197,34 @@ async function run(browser, label, contextOptions) {
     for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
   }
 
-  // 1. The start page with a poll filled in and a photo picked for each option:
-  // the thumbnails show before anything is uploaded.
-  await page.goto(base)
-  await page.getByLabel('Option A text').waitFor()
-  await page.getByLabel('Question').fill(QUESTION)
-  await page.getByLabel('Option A text').fill(OPTION_A)
-  await page.getByLabel('Option B text').fill(OPTION_B)
-  await page.getByLabel('Close at').fill(String(TARGET))
-  const photos = await samplePhotos(page)
-  await page.getByLabel('Option A photo').setInputFiles({ name: 'speckled-blue-mug.jpg', mimeType: 'image/jpeg', buffer: photos.a })
-  await page.getByLabel('Option B photo').setInputFiles({ name: 'white-mug-walnut.jpg', mimeType: 'image/jpeg', buffer: photos.b })
-  await page.locator('img.thumb').nth(1).waitFor()
+  // 1. The photo test with three candidate photos (wide, tall and square) in the
+  // mock Etsy search grid, each cropped square; nothing is uploaded yet.
+  await page.goto(`${base}${TOOL}`)
+  await page.getByLabel('Add photos').waitFor({ state: 'attached' })
+  await page.getByLabel('Add photos').setInputFiles(await samplePhotos(page))
+  const grid = page.getByRole('list', { name: 'Mock Etsy search results' })
+  await grid.locator('img').nth(2).waitFor()
+  await waitForImages('.etsy-grid img')
+  // On a phone the grid sits below the intro, so the shot starts at the grid.
+  await shot('tool', label === 'mobile' ? { from: grid } : {})
+
+  // 2. "Let strangers pick" (the core action): the new-poll form opens with the
+  // three photos as options A–C, still on the device.
+  await page.getByRole('button', { name: 'Let strangers pick' }).click()
+  // The dev server compiles each page on its first visit, which can outlast the default 30 s wait.
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 120_000 })
+  await page.locator('img.thumb').nth(2).waitFor()
   await waitForImages('img.thumb')
-  // On a phone the options sit below the intro, so the shot starts at the form.
-  await shot('home', label === 'mobile' ? { from: page.locator('form') } : {})
+  await shot('form', { from: page.locator('form') })
 
-  // 2. Post it (the core action): the photos upload, and the poll page shows both
-  // on the swipe card, served by tiebreak.
+  // 3. Create it: the photos upload, and the poll page shows all three to vote on,
+  // served by tiebreak.
   await page.getByRole('button', { name: 'Create poll' }).click()
-  await page.waitForURL(/\/p\/[^/?]+/)
+  await page.waitForURL(/\/p\/[^/?]+/, { timeout: 120_000 })
   await page.getByText('Your poll is live').waitFor()
-  await waitForImages('.swipe-card img')
+  await page.locator('.grid .face img').nth(2).waitFor()
+  await waitForImages('.grid .face img')
   await shot('poll')
-
-  // 3. Two strangers vote; the creator swipes the last vote on the card, which
-  // closes the poll and shows its winner with the split.
-  const id = new URL(page.url()).pathname.split('/').pop()
-  await strangerVotes(id, 0)
-  await strangerVotes(id, 1)
-  await page.goto(`${base}/p/${id}`)
-  await page.getByText(`2 of ${TARGET} votes`).waitFor()
-  await page.getByRole('button', { name: 'Pick A' }).click()
-  await page.getByText(/^Winner:/).waitFor()
-  await page.getByText(`Closed with ${TARGET} votes`).waitFor()
-  await waitForImages('.result img')
-  await shot('result')
 
   await context.close()
 }

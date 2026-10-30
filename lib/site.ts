@@ -13,6 +13,9 @@ export const HOME_TITLE = 'tiebreak — let strangers break the tie'
 export const SITE_DESCRIPTION =
   "Can't choose? Post 2–4 options, share the link, and let people swipe to pick one. The poll closes at your vote target or deadline."
 
+/** The free Etsy listing photo test (GROWTH.md, 2026-10-30). Its visits are counted apart (lib/beacon.ts). */
+export const ETSY_PHOTO_TEST_PATH = '/tools/etsy-listing-photo-test'
+
 /** The public pages search engines should list (poll pages are people's own links, so they're left out). */
 export const PUBLIC_PAGES = [
   '/',
@@ -23,6 +26,7 @@ export const PUBLIC_PAGES = [
   '/pickfu-alternative',
   '/which-etsy-photo-is-best',
   '/choose-a-thumbnail-or-book-cover',
+  ETSY_PHOTO_TEST_PATH,
 ] as const
 
 /** RepoHQ's visit counter for idea products (anonymous: no cookies, an hourly-limited IP hash). */

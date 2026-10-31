@@ -110,7 +110,57 @@ export function fromPglite(pg: PGlite): Db {
   }
 }
 
+/**
+ * Cloudflare Workers (navigator.userAgent is set by the runtime; Node's is "Node.js/…"). There a socket
+ * belongs to the request that opened it, so a pool shared across requests fails with "Cannot perform I/O
+ * on behalf of a different request".
+ */
+export function onWorkers(): boolean {
+  return typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
+}
+
+/** On Workers: one connection per query or transaction, closed when it's done (no pool to share). */
+async function perRequestPg(connectionString: string): Promise<Db> {
+  const { default: pg } = await import('pg')
+  async function withClient<T>(fn: (client: InstanceType<typeof pg.Client>) => Promise<T>): Promise<T> {
+    const client = new pg.Client({ connectionString, connectionTimeoutMillis: 10_000 })
+    // pg-cloudflare's read loop reports "This socket has been closed" once end() closes it: expected then, so
+    // it's dropped. Any other socket error is logged (a query's own failure still rejects that query).
+    let ending = false
+    client.on('error', (error: Error) => {
+      if (!ending) console.error(`Postgres connection: ${error.message}`)
+    })
+    await client.connect()
+    try {
+      return await fn(client)
+    } finally {
+      ending = true
+      await client.end().catch(() => {})
+    }
+  }
+  const run =
+    (client: InstanceType<typeof pg.Client>) =>
+    async <T>(text: string, params?: unknown[]) =>
+      (await client.query(text, params)) as unknown as { rows: T[] }
+  return {
+    query: <T>(text: string, params?: unknown[]) => withClient((client) => run(client)<T>(text, params)),
+    transaction: (fn) =>
+      withClient(async (client) => {
+        await client.query('BEGIN')
+        try {
+          const result = await fn({ query: run(client) })
+          await client.query('COMMIT')
+          return result
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => {})
+          throw error
+        }
+      }),
+  }
+}
+
 async function fromPg(connectionString: string): Promise<Db> {
+  if (onWorkers()) return perRequestPg(connectionString)
   const { default: pg } = await import('pg')
   const pool = new pg.Pool({
     connectionString,

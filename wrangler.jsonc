@@ -1,0 +1,24 @@
+// tiebreak on Cloudflare Workers (free plan), through the OpenNext adapter: `npm run cf:build` turns the
+// Next.js build into .open-next/worker.js plus static assets. Vercel ignores this file, so both hosts
+// build from the same code until the switch. Deploy with the credential broker, which injects the token:
+//   provision cloudflare deploy tiebreak <this checkout>
+// Secrets (DATABASE_URL, STRIPE_*) are Worker secrets: `provision cloudflare secret tiebreak <KEY>`.
+// Local runs read them from .dev.vars (gitignored, like every .env file).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tiebreak",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-15",
+  // nodejs_compat: node:crypto, node:dns, node:net, Buffer and pg's TCP sockets. It also fills process.env
+  // from vars and secrets, which is where the app reads them.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    // OpenNext calls the Worker itself for some cache work; the name must match "name" above.
+    { "binding": "WORKER_SELF_REFERENCE", "service": "tiebreak" }
+  ],
+  "observability": { "enabled": true }
+}

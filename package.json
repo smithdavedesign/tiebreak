@@ -9,9 +9,13 @@
     "start": "next start",
     "test": "vitest run",
     "screenshots": "node scripts/screenshots.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cf:build": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.15",
     "next": "^16.4.0",
     "pg": "^8.23.1",
     "react": "^19.3.0",
@@ -25,6 +29,7 @@
     "@types/react-dom": "^19.3.0",
     "playwright-core": "^1.60.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.156.0"
   }
 }

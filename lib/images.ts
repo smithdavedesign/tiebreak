@@ -50,10 +50,11 @@ export function uploadedImageId(url: URL, ownOrigin: string): string | null {
 // ── Checking and cleaning ──────────────────────────────────────────────────
 
 export type Inspected =
-  | { ok: true; type: ImageType; bytes: Uint8Array; width: number; height: number }
+  /** `orientation`: a JPEG's EXIF orientation (1–8; 1 is upright, and all a PNG or WebP has). */
+  | { ok: true; type: ImageType; bytes: Uint8Array; width: number; height: number; orientation: number }
   | { ok: false; reason: 'not_image' | 'too_many_pixels' }
 
-type Cleaned = { bytes: Buffer; width: number; height: number } | null
+type Cleaned = { bytes: Buffer; width: number; height: number; orientation?: number } | null
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -175,7 +176,7 @@ function cleanJpeg(b: Buffer): Cleaned {
   }
   if (!scanned || !width || !height) return null
   if (orientation !== null && orientation > 1) parts.splice(1, 0, orientationExif(orientation))
-  return { bytes: Buffer.concat(parts), width, height }
+  return { bytes: Buffer.concat(parts), width, height, orientation: orientation ?? 1 }
 }
 
 // The PNG chunks that draw the image: header, palette, pixels and end, transparency,
@@ -283,7 +284,7 @@ export function inspectImage(input: Uint8Array): Inspected {
   }
   if (!cleaned) return { ok: false, reason: 'not_image' }
   if (cleaned.width * cleaned.height > MAX_IMAGE_PIXELS) return { ok: false, reason: 'too_many_pixels' }
-  return { ok: true, type, ...cleaned }
+  return { ok: true, type, orientation: 1, ...cleaned }
 }
 
 // ── Storing and serving ────────────────────────────────────────────────────

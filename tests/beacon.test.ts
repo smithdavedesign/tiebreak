@@ -3,22 +3,36 @@
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PrivacyPage from '@/app/privacy/page'
-import { NOTRACK_KEY, referrerFor, sendSignal, shouldSend } from '@/lib/beacon'
+import { NOTRACK_KEY, deployEnv, referrerFor, sendSignal, shouldSend } from '@/lib/beacon'
 import { SIGNAL_URL } from '@/lib/site'
 
 describe('shouldSend', () => {
-  const ok = { vercelEnv: 'production', webdriver: false, optedOut: false }
+  const ok = { deployEnv: 'production', webdriver: false, optedOut: false }
   it('sends on production for a normal browser', () => {
     expect(shouldSend(ok)).toBe(true)
   })
   it('sends nothing on previews, in local dev or when the env is unknown', () => {
-    expect(shouldSend({ ...ok, vercelEnv: 'preview' })).toBe(false)
-    expect(shouldSend({ ...ok, vercelEnv: 'development' })).toBe(false)
-    expect(shouldSend({ ...ok, vercelEnv: undefined })).toBe(false)
+    expect(shouldSend({ ...ok, deployEnv: 'preview' })).toBe(false)
+    expect(shouldSend({ ...ok, deployEnv: 'development' })).toBe(false)
+    expect(shouldSend({ ...ok, deployEnv: undefined })).toBe(false)
   })
   it('sends nothing from automated browsers or after the notrack opt-out', () => {
     expect(shouldSend({ ...ok, webdriver: true })).toBe(false)
     expect(shouldSend({ ...ok, optedOut: true })).toBe(false)
+  })
+})
+
+describe('deployEnv', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it("is the Cloudflare build's NEXT_PUBLIC_DEPLOY_ENV, else Vercel's NEXT_PUBLIC_VERCEL_ENV", () => {
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'preview')
+    expect(deployEnv()).toBe('preview')
+    vi.stubEnv('NEXT_PUBLIC_DEPLOY_ENV', 'production')
+    expect(deployEnv()).toBe('production')
+  })
+  it('the Cloudflare build sets it, so a Worker build counts its visitors', async () => {
+    const pkg = (await import('../package.json')).default as { scripts: Record<string, string> }
+    expect(pkg.scripts['cf:build']).toMatch(/NEXT_PUBLIC_DEPLOY_ENV=production /)
   })
 })
 

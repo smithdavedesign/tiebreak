@@ -210,7 +210,7 @@ describe.skipIf(!CHROMIUM)('share cards and "Make your own tiebreak" in Chromium
     await context.exposeFunction('__tiebreakSignal', (body: string) => {
       signals.push(JSON.parse(body))
     })
-    await context.route('https://repohq.vercel.app/**', (route) => route.abort())
+    await context.route('https://idea-factory.1426davejobs.workers.dev/**', (route) => route.abort())
     await context.addInitScript((signalUrl: string) => {
       // A visitor's browser, not an automated one; and the signal endpoint answered here.
       Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })

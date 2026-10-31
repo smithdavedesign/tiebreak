@@ -28,8 +28,12 @@ export const PUBLIC_PAGES = [
   '/tools/youtube-thumbnail-preview',
 ] as const
 
-/** RepoHQ's visit counter for idea products (anonymous: no cookies, an hourly-limited IP hash). */
-export const SIGNAL_URL = 'https://repohq.vercel.app/api/ideas/signal'
+/**
+ * The idea pipeline's visit counter (anonymous: no cookies, an hourly-limited IP hash): the idea-factory
+ * Worker on Cloudflare since 2026-10-31, writing to RepoHQ's idea_signals (RepoHQ's own endpoint moved
+ * behind Tailscale). idea-factory policy.json signalUrl.
+ */
+export const SIGNAL_URL = 'https://idea-factory.1426davejobs.workers.dev/api/ideas/signal'
 
 /** Where people reach us (privacy and terms pages): the repo's public issue tracker. */
 export const ISSUES_URL = 'https://github.com/smithdavedesign/tiebreak/issues'

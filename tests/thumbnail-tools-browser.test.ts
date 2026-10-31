@@ -24,7 +24,7 @@ const SIZES: Record<'desktop' | 'phone', BrowserContextOptions> = {
 }
 const sizes = Object.keys(SIZES) as (keyof typeof SIZES)[]
 const pathOf = (kind: (typeof TOOLS)[number]['kind']) => TOOLS.find((t) => t.kind === kind)!.path
-const SIGNALS = 'https://repohq.vercel.app/**'
+const SIGNALS = 'https://idea-factory.1426davejobs.workers.dev/**'
 
 type Sample = { name: string; type: 'image/jpeg' | 'image/png' | 'image/webp'; width: number; height: number; colour: string }
 

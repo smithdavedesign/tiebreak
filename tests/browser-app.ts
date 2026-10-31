@@ -56,7 +56,7 @@ export default async function setup(project: TestProject) {
       name === 'NODE_ENV' ||
       name.startsWith('STRIPE_') ||
       name.startsWith('VITEST') ||
-      name.endsWith('VERCEL_ENV')
+      name.endsWith('VERCEL_ENV') || name === 'NEXT_PUBLIC_DEPLOY_ENV'
     if (drop) delete env[name]
   }
   env.NEXT_PUBLIC_VERCEL_ENV = 'production'

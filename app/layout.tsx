@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { GUIDES } from '@/lib/guides'
-import { HOME_TITLE, JSON_LD, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
+import { ETSY_PHOTO_TEST_PATH, HOME_TITLE, JSON_LD, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site'
 import { VisitBeacon } from './visit-beacon'
 import './globals.css'
 
@@ -48,6 +48,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href={g.path}>{g.label}</Link>
               </span>
             ))}
+            {' · '}
+            <Link href={ETSY_PHOTO_TEST_PATH}>Etsy listing photo tester</Link>
           </p>
           <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms &amp; refunds</Link>
         </footer>

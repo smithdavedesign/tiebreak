@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ISSUES_URL, pageMetadata } from '@/lib/site'
+import { ETSY_PHOTO_TEST_PATH, ISSUES_URL, pageMetadata } from '@/lib/site'
 
 export const metadata = pageMetadata(
   '/privacy',
@@ -48,12 +48,15 @@ export default function PrivacyPage() {
       <h2>Visit counting</h2>
       <p>
         Our own counter (RepoHQ) gets three anonymous events: a &ldquo;visit&rdquo; (the first page you open in a browser
-        session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
+        session, and the <Link href={ETSY_PHOTO_TEST_PATH}>Etsy listing photo tester</Link> the first time you open it in
+        a session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
         (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
-        your browser shares it. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
+        your browser shares it; a visit to the photo tester also carries that page&apos;s address, so its visits are
+        counted on their own. Photos you add to the tester aren&apos;t sent anywhere unless you post a poll with them. No
+        cookie is set and no id is sent. The counter stores a one-way hash of your IP address
         with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
         automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting
-        you twice, your browser keeps two small flags in its own storage; they never leave your device. There are no
+        you twice, your browser keeps a few small flags in its own storage; they never leave your device. There are no
         third-party analytics, ad trackers or pixels.
       </p>
 

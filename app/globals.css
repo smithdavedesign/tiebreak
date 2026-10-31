@@ -470,3 +470,163 @@ button.danger {
 .guide-cta p {
   margin: 0;
 }
+
+/* The Etsy listing photo tester: a mock Etsy search grid, wider than the text column on big screens */
+.tester-fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 30rem) {
+  .tester-fields {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.etsy-mock {
+  width: min(60rem, calc(100vw - 2rem));
+  margin: 1rem 0 1rem calc(50% - min(30rem, calc(50vw - 1rem)));
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.etsy-search {
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.etsy-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 0.75rem;
+}
+
+@media (min-width: 48rem) {
+  .etsy-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25rem 1rem;
+  }
+}
+
+.etsy-photo,
+.etsy-add {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.5rem;
+}
+
+.etsy-photo {
+  overflow: hidden;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+}
+
+.etsy-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.etsy-photo .photo-name {
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.etsy-letter {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  background: rgba(29, 29, 31, 0.8);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  border-radius: 0.4rem;
+  padding: 0.1rem 0.45rem;
+}
+
+button.etsy-remove {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.etsy-title {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.etsy-price {
+  margin: 0.15rem 0 0;
+  font-weight: 700;
+}
+
+label.etsy-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 2px dashed var(--line);
+  text-align: center;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.etsy-add:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.etsy-add .pick {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.etsy-caption {
+  margin: 0.75rem 0 0;
+}
+
+.tester-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin: 1rem 0;
+}
+
+/* Opening the form scrolls it to the top; this keeps its heading clear of the edge. */
+.tester-poll {
+  scroll-margin-top: 1rem;
+}
+
+.tester-poll h2 {
+  margin: 1.5rem 0 0.25rem;
+}

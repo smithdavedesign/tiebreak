@@ -1,5 +1,6 @@
+import Link from 'next/link'
 import { TryTiebreak } from '@/app/guide-parts'
-import { pageMetadata } from '@/lib/site'
+import { ETSY_PHOTO_TEST_PATH, pageMetadata } from '@/lib/site'
 
 export const metadata = pageMetadata(
   '/which-etsy-photo-is-best',
@@ -45,6 +46,11 @@ export default function EtsyPhotoPage() {
         <li>Share the link with shop followers, friends who shop on Etsy, or a community that allows it.</li>
         <li>When the poll closes you see the winner and the vote split.</li>
       </ol>
+      <p>
+        To see your candidates side by side as thumbnails first, try the{' '}
+        <Link href={ETSY_PHOTO_TEST_PATH}>free Etsy listing photo tester</Link>: it puts them in a mock search grid, then
+        makes them a poll.
+      </p>
       <p>
         Treat a tally as a quick signal. Voters are anonymous and may not be your buyers, and the real test is how
         shoppers click once the listing is live. You can reorder your Etsy photos at any time, so try the winner and watch

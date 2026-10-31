@@ -51,10 +51,28 @@ function uploadError(status: number, body: { error?: unknown } | null) {
   return "The photo didn't upload. Try again."
 }
 
-export function CreatePollForm({ account, plan }: { account: AccountView; plan: Plan }) {
+/**
+ * `initialPhotos` (2–4, from the Etsy photo tester) start the form with one option per photo, in order;
+ * like any picked photo, they upload only when the poll is posted.
+ */
+export function CreatePollForm({
+  account,
+  plan,
+  initialQuestion = '',
+  initialPhotos = [],
+}: {
+  account: AccountView
+  plan: Plan
+  initialQuestion?: string
+  initialPhotos?: File[]
+}) {
   const router = useRouter()
-  const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState<Draft[]>([blank(), blank()])
+  const [question, setQuestion] = useState(initialQuestion)
+  const [options, setOptions] = useState<Draft[]>(() =>
+    initialPhotos.length >= MIN_OPTIONS
+      ? initialPhotos.slice(0, MAX_OPTIONS).map((photo) => ({ ...blank(), photo }))
+      : [blank(), blank()],
+  )
   const [target, setTarget] = useState(String(DEFAULT_TARGET))
   const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [isPublic, setIsPublic] = useState(false)
@@ -290,7 +308,7 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
  * The object URL lives as long as this thumbnail. A file the browser can't draw
  * shows its name instead.
  */
-function Thumbnail({ file, alt }: { file: File; alt: string }) {
+export function Thumbnail({ file, alt, className = 'thumb' }: { file: File; alt: string; className?: string }) {
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   useEffect(() => {
@@ -299,5 +317,5 @@ function Thumbnail({ file, alt }: { file: File; alt: string }) {
     return () => URL.revokeObjectURL(url)
   }, [file])
   if (!src || failed === src) return <span className="photo-name">{file.name}</span>
-  return <img className="thumb" src={src} alt={alt} onError={() => setFailed(src)} />
+  return <img className={className} src={src} alt={alt} onError={() => setFailed(src)} />
 }

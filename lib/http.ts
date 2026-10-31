@@ -82,10 +82,10 @@ export const mediaTypeOf = (request: Request) =>
   request.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
 
 /**
- * A request body's bytes, or null once it passes `maxBytes`: a declared length over
- * the cap is refused unread, and a streamed body stops being read at the cap.
+ * A request body's bytes (or a fetched response's), or null once it passes `maxBytes`: a
+ * declared length over the cap is refused unread, and a streamed body stops being read at the cap.
  */
-export async function readCapped(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+export async function readCapped(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<Uint8Array | null> {
   if (Number(request.headers.get('content-length') ?? 0) > maxBytes) return null
   if (!request.body) return new Uint8Array(0)
   const reader = request.body.getReader()

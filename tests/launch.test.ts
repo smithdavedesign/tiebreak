@@ -143,13 +143,15 @@ describe('a poll share page', () => {
     const { body } = await createPoll({ ...basicPoll, question: 'Speckled mug or white mug?' }, voter(1))
     const meta = await pollMetadata({ params: Promise.resolve({ id: body.id }) })
     expect(meta.robots).toMatchObject({ index: false })
+    // The poll's own card (tests/share-card.test.ts), not the site's: same size, its own address.
+    const card = { url: `/p/${body.id}/card?v=open`, width: SHARE_IMAGE.width, height: SHARE_IMAGE.height }
     expect(meta.openGraph).toMatchObject({
       siteName: 'tiebreak',
       url: `/p/${body.id}`,
       title: 'Speckled mug or white mug?',
-      images: [SHARE_IMAGE],
+      images: [card],
     })
-    expect(meta.twitter).toMatchObject({ card: 'summary_large_image', title: 'Speckled mug or white mug?' })
+    expect(meta.twitter).toMatchObject({ card: 'summary_large_image', title: 'Speckled mug or white mug?', images: [card] })
   })
 })
 

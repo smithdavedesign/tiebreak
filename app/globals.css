@@ -352,6 +352,11 @@ button.link {
   flex: 1;
 }
 
+/* Under a poll you voted on: make your own */
+.make-own p {
+  margin: 0 0 0.75rem;
+}
+
 label.check {
   display: flex;
   gap: 0.6rem;

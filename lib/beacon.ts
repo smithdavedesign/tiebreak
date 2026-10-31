@@ -8,8 +8,8 @@ export const ACTIVATED_KEY = 'repohq:activated'
 export const VISITED_KEY = 'repohq:visited'
 
 type Context = {
-  /** NEXT_PUBLIC_VERCEL_ENV: only 'production' counts; previews and local runs send nothing. */
-  vercelEnv: string | undefined
+  /** deployEnv(): only 'production' counts; previews and local runs send nothing. */
+  deployEnv: string | undefined
   /** navigator.webdriver: automated browsers aren't visitors. */
   webdriver: boolean
   /** localStorage "repohq:notrack" is set: the owner opted out on this browser. */
@@ -17,8 +17,17 @@ type Context = {
 }
 
 /** The send-or-not decision, before any once-per-session/browser check. */
-export function shouldSend({ vercelEnv, webdriver, optedOut }: Context): boolean {
-  return vercelEnv === 'production' && !webdriver && !optedOut
+export function shouldSend({ deployEnv, webdriver, optedOut }: Context): boolean {
+  return deployEnv === 'production' && !webdriver && !optedOut
+}
+
+/**
+ * Which deployment this build is, on either host: the Cloudflare build sets NEXT_PUBLIC_DEPLOY_ENV
+ * (`npm run cf:build`); Vercel sets NEXT_PUBLIC_VERCEL_ENV. Both are inlined at build time, so each
+ * must be read by its full literal name.
+ */
+export function deployEnv(): string | undefined {
+  return process.env.NEXT_PUBLIC_DEPLOY_ENV ?? process.env.NEXT_PUBLIC_VERCEL_ENV
 }
 
 /** A link's tag: a short word of lower-case letters, digits and dashes, so nothing else in an address is sent. */
@@ -54,7 +63,7 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
 export function sendSignal(kind: SignalKind, path?: string): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
-    if (!shouldSend({ vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV, webdriver: navigator.webdriver === true, optedOut })) return
+    if (!shouldSend({ deployEnv: deployEnv(), webdriver: navigator.webdriver === true, optedOut })) return
     const ref = kind === 'visit' ? refFor(location.search) : null
     if (kind === 'visit') {
       const key = path ? `${VISITED_KEY}:${path}` : ref === null ? VISITED_KEY : `${VISITED_KEY}:${ref}`

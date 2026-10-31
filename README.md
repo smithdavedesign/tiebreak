@@ -65,7 +65,8 @@ npx wrangler dev                                   # run the built Worker locall
 provision cloudflare deploy tiebreak "$PWD"         # deploy with the broker (token from the keychain)
 provision cloudflare secret tiebreak DATABASE_URL  # and STRIPE_PAYMENT_LINK, STRIPE_WEBHOOK_SECRET
 ```
-`NEXT_PUBLIC_*` values are baked in at build time: build production with `NEXT_PUBLIC_SITE_URL=<its address>` and
-`NEXT_PUBLIC_VERCEL_ENV=production` (the visit beacon only counts production). On Workers each query or transaction
+`NEXT_PUBLIC_*` values are baked in at build time: build production with `NEXT_PUBLIC_SITE_URL=<its address>`.
+`cf:build` sets `NEXT_PUBLIC_DEPLOY_ENV=production` itself, so the visit beacon counts the Worker's visitors
+(`lib/beacon.ts` `deployEnv()`; on Vercel it reads `NEXT_PUBLIC_VERCEL_ENV`). On Workers each query or transaction
 gets its own Postgres connection (`lib/db.ts`), since a socket can't outlive the request that opened it.
 Screenshots of the built Worker running locally are in `docs/screenshots/cloudflare-local/`.

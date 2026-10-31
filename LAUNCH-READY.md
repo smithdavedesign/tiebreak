@@ -73,7 +73,7 @@ curl -s -A Twitterbot https://tiebreak-phi.vercel.app/pro | grep -oE '<(title|li
 ```
 Paste the home page into Google's Rich Results Test to see the `SoftwareApplication` offer. For the beacon,
 open the live site in a normal window and watch DevTools › Network for a `POST` to
-`repohq.vercel.app/api/ideas/signal`. Then set `localStorage.setItem('repohq:notrack', '1')` in your own
+`idea-factory.1426davejobs.workers.dev/api/ideas/signal`. Then set `localStorage.setItem('repohq:notrack', '1')` in your own
 browser so your visits aren't counted.
 
 Not verified from here: the `<head>` of the dynamic pages (`/`, `/feed`, `/pro`) as Next serves them. They use

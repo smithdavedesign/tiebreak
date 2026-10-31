@@ -7,11 +7,11 @@
 **Core action:** creating a poll (the form on `/` getting a `201` from `POST /polls`). That's the first thing the primary payer (a seller or creator choosing between options) does; voting in the feed is the secondary, free-user action and isn't counted as activation.
 
 **What changed**
-- `lib/beacon.ts` (new): `shouldSend` is the pure send-or-not decision (production only, not `navigator.webdriver`, not opted out), `referrerFor` returns `document.referrer` only when its origin differs from `location.origin`, and `sendSignal(kind)` POSTs `{"slug": "tiebreak", "kind": …, "referrer": …}` to `https://repohq.vercel.app/api/ideas/signal` (fire-and-forget, `keepalive`, `credentials: 'omit'`, no cookies).
+- `lib/beacon.ts` (new): `shouldSend` is the pure send-or-not decision (production only, not `navigator.webdriver`, not opted out), `referrerFor` returns `document.referrer` only when its origin differs from `location.origin`, and `sendSignal(kind)` POSTs `{"slug": "tiebreak", "kind": …, "referrer": …}` to `https://idea-factory.1426davejobs.workers.dev/api/ideas/signal` (fire-and-forget, `keepalive`, `credentials: 'omit'`, no cookies).
 - `visit`: once per browser session (sessionStorage), on every page. `VisitBeacon` moved from the home page into the root layout.
 - `activate`: the first successful poll creation per browser (localStorage), in `app/create-poll-form.tsx`.
 - `checkout`: every click on the Pro Buy button (`app/pro/upgrade-button.tsx`), before Checkout opens. If the Buy button moves, so must this call.
-- Nothing is sent on preview deployments (`NEXT_PUBLIC_VERCEL_ENV` isn't `production`, which includes local dev), when `navigator.webdriver` is true, or when localStorage `repohq:notrack` is set. If storage is blocked, nothing is sent rather than repeating a once-only event.
+- Nothing is sent on preview deployments (`deployEnv()` isn't `production`: `NEXT_PUBLIC_DEPLOY_ENV`, set by `cf:build`, else Vercel's `NEXT_PUBLIC_VERCEL_ENV`; local dev has neither), when `navigator.webdriver` is true, or when localStorage `repohq:notrack` is set. If storage is blocked, nothing is sent rather than repeating a once-only event.
 - The privacy page now names the three events, the opt-out and the two local flags. It still says no cookies and no third-party analytics.
 - The old event kind was `view`; it's now `visit`. Prices, payment links and keys are untouched.
 - Tests: `tests/beacon.test.ts` (decision table, referrer rule, once-per-session/browser, no-send cases, payload, privacy copy).

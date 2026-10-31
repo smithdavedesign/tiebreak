@@ -48,6 +48,6 @@ describe('search and share metadata', () => {
     expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' })
   })
   it('the beacon goes to RepoHQ over https', () => {
-    expect(SIGNAL_URL).toBe('https://repohq.vercel.app/api/ideas/signal')
+    expect(SIGNAL_URL).toBe('https://idea-factory.1426davejobs.workers.dev/api/ideas/signal')
   })
 })

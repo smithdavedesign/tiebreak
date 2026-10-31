@@ -8,3 +8,5 @@ next-env.d.ts
 .vercel/
 .env*
 .DS_Store
+# A local leftover from the 2026-10-22 build (its sandbox couldn't delete files): delete the file and this line.
+scripts/look-tmp.mjs

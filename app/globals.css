@@ -475,3 +475,233 @@ button.danger {
 .guide-cta p {
   margin: 0;
 }
+
+/* Thumbnail tools (GROWTH.md, 2026-10-22): a wider page for the mocks, the picker, the mocks and the hand-off */
+main:has(.tool-page) {
+  max-width: 64rem;
+}
+
+.tool-page > p,
+.tool-page > ul {
+  max-width: 40rem;
+}
+
+.tool-page h2 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.25rem;
+}
+
+.candidates {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+}
+
+.candidates li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.5rem;
+}
+
+.candidates .error {
+  flex-basis: 100%;
+}
+
+.tool-empty {
+  margin: 1rem 0;
+}
+
+.mocks {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.mock {
+  min-width: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.mock h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.preview-tile {
+  margin: 0;
+  min-width: 0;
+}
+
+.preview-tile img {
+  display: block;
+}
+
+/* A fixed shape; the image fills it and is cropped from the centre, as the platforms do. */
+.crop {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--bg);
+}
+
+.crop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ratio-1-1 {
+  aspect-ratio: 1 / 1;
+}
+
+.ratio-4-3 {
+  aspect-ratio: 4 / 3;
+}
+
+.ratio-5-4 {
+  aspect-ratio: 5 / 4;
+}
+
+.ratio-16-9 {
+  aspect-ratio: 16 / 9;
+}
+
+.mock-line {
+  display: block;
+  height: 0.5rem;
+  width: 90%;
+  border-radius: 1rem;
+  background: var(--line);
+}
+
+.mock-line.short {
+  width: 55%;
+}
+
+/* Etsy: a search grid per crop, four across on a computer and two on a phone */
+.mock-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem 0.8rem;
+}
+
+.etsy-card figcaption {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+/* Book covers: a shelf per height, side by side (it scrolls sideways if they don't fit) */
+.shelf {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.cover {
+  flex: none;
+  text-align: center;
+}
+
+.cover img {
+  width: auto;
+  border-radius: 0.15rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.shelf-160 .cover img {
+  height: 160px;
+}
+
+.shelf-80 .cover img {
+  height: 80px;
+}
+
+.cover figcaption {
+  margin-top: 0.3rem;
+}
+
+/* YouTube: a desktop grid, and a phone's feed (tiles edge to edge, one per row) */
+.yt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 0.8rem;
+}
+
+.phone-frame {
+  display: grid;
+  gap: 1rem;
+  max-width: 22.5rem;
+  padding: 0.75rem 0;
+  border: 1px solid var(--line);
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+
+.yt-phone .crop {
+  border-radius: 0;
+}
+
+.yt-tile figcaption {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.yt-phone .yt-tile figcaption {
+  padding: 0 0.75rem;
+}
+
+.avatar {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.lines {
+  flex: 1;
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+}
+
+.duration {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.tool-cta {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}
+
+.tool-cta p {
+  margin: 0;
+}
+
+@media (max-width: 40rem) {
+  .mock-grid,
+  .yt-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

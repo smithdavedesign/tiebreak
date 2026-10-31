@@ -29,6 +29,9 @@ const terms = await import('@/app/terms/page')
 const pickfu = await import('@/app/pickfu-alternative/page')
 const etsy = await import('@/app/which-etsy-photo-is-best/page')
 const thumbnail = await import('@/app/choose-a-thumbnail-or-book-cover/page')
+const etsyTool = await import('@/app/tools/etsy-thumbnail-preview/page')
+const coverTool = await import('@/app/tools/book-cover-thumbnail-test/page')
+const youtubeTool = await import('@/app/tools/youtube-thumbnail-preview/page')
 
 useTestDb()
 
@@ -42,6 +45,9 @@ const PAGES: Record<(typeof PUBLIC_PAGES)[number], { metadata: Metadata; render:
   '/pickfu-alternative': { metadata: pickfu.metadata, render: () => pickfu.default() },
   '/which-etsy-photo-is-best': { metadata: etsy.metadata, render: () => etsy.default() },
   '/choose-a-thumbnail-or-book-cover': { metadata: thumbnail.metadata, render: () => thumbnail.default() },
+  '/tools/etsy-thumbnail-preview': { metadata: etsyTool.metadata, render: () => etsyTool.default() },
+  '/tools/book-cover-thumbnail-test': { metadata: coverTool.metadata, render: () => coverTool.default() },
+  '/tools/youtube-thumbnail-preview': { metadata: youtubeTool.metadata, render: () => youtubeTool.default() },
 }
 const entries = Object.entries(PAGES)
 

@@ -51,10 +51,38 @@ function uploadError(status: number, body: { error?: unknown } | null) {
   return "The photo didn't upload. Try again."
 }
 
+/** Uploads one photo (POST /images): its URL on tiebreak, or why it was refused. */
+export async function uploadPhoto(file: File): Promise<{ url: string } | { error: string }> {
+  const res = await fetch('/images', {
+    method: 'POST',
+    headers: { 'content-type': file.type || 'application/octet-stream' },
+    body: file,
+  })
+  const body = await res.json().catch(() => null)
+  if (res.status === 201 && typeof body?.url === 'string') return { url: body.url }
+  return { error: uploadError(res.status, body) }
+}
+
+/** A new poll a thumbnail tool (app/tools) started: its question, and its photos, already uploaded. */
+type HandOff = { question: string; photos: { file: File; url: string }[] }
+// Kept in the page's memory until the form below opens: the tool navigates to it client-side.
+let handOff: HandOff | null = null
+
+/** Opens the form on / with these photos as options A, B, … (the caller then navigates there). */
+export function handOffToNewPoll(next: HandOff) {
+  handOff = next
+}
+
 export function CreatePollForm({ account, plan }: { account: AccountView; plan: Plan }) {
   const router = useRouter()
-  const [question, setQuestion] = useState('')
-  const [options, setOptions] = useState<Draft[]>([blank(), blank()])
+  const [prefill] = useState(() => handOff)
+  useEffect(() => {
+    handOff = null // taken: the next visit to / starts blank
+  }, [])
+  const [question, setQuestion] = useState(prefill?.question ?? '')
+  const [options, setOptions] = useState<Draft[]>(() =>
+    prefill ? prefill.photos.map(({ file, url }) => ({ ...blank(), photo: file, uploaded: url })) : [blank(), blank()],
+  )
   const [target, setTarget] = useState(String(DEFAULT_TARGET))
   const [durationHours, setDurationHours] = useState(DEFAULT_HOURS)
   const [isPublic, setIsPublic] = useState(false)
@@ -76,17 +104,12 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
       options.map(async (o, i): Promise<string | null | false> => {
         if (!o.photo) return null
         if (o.uploaded) return o.uploaded
-        const res = await fetch('/images', {
-          method: 'POST',
-          headers: { 'content-type': o.photo.type || 'application/octet-stream' },
-          body: o.photo,
-        })
-        const body = await res.json().catch(() => null)
-        if (res.status === 201 && typeof body?.url === 'string') {
-          update(i, { uploaded: body.url })
-          return body.url
+        const result = await uploadPhoto(o.photo)
+        if ('url' in result) {
+          update(i, { uploaded: result.url })
+          return result.url
         }
-        update(i, { photoError: uploadError(res.status, body) })
+        update(i, { photoError: result.error })
         return false
       }),
     )

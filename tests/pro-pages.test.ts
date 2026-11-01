@@ -24,6 +24,7 @@ vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) => (cookie && name === 'tb_voter' ? { name, value: cookie } : undefined),
   }),
+  headers: async () => new Headers(), // a browser: no native-app header (the poll page reads it since 2026-11-01)
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),

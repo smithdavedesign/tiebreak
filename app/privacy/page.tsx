@@ -57,7 +57,9 @@ export default function PrivacyPage() {
         your browser shares it. A visit to one of the free thumbnail tools also says which tool page it was, and is counted
         once per session for each. A link of ours can carry a short tag, like <code>ref=poll</code> on &ldquo;Make your own
         tiebreak&rdquo; under a poll you voted on; following one sends one more visit with that tag, so we can tell which
-        links bring people. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
+        links bring people. A vote link from a poll creator&apos;s newsletter ends in <code>src=newsletter</code>; a visit
+        from one also says which poll page it opened and that it came from a newsletter, once per session for each
+        poll. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
         with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from
         automated browsers, or if you set <code>repohq:notrack</code> in this site&apos;s local storage. To avoid counting
         you twice, your browser keeps a few small flags in its own storage; they never leave your device. There are no

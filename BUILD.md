@@ -529,6 +529,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - after you vote, the credit meter with links to the feed and to posting;
     - for a public poll, the creator's banner says it's live in the public feed.
   - The link keeps working after a poll is hidden from the feed.
+  - **New (growth, 2026-11-01, see GROWTH.md):** while a poll is open, its creator (by cookie, or the app's `x-tiebreak-voter` header) gets "Get votes from your newsletter": copyable HTML and Markdown blocks with one vote link per option. `?pick=B` opens the page with B preselected and one "Confirm vote" button; nothing is cast until it's pressed.
   - **New in M3:**
     - **Private polls, for anyone but the creator.** Once closed, the page says "This poll has closed. Its creator keeps the result private." It shows your own vote but no winner or split. While open, after you vote, the page says the result is private.
     - **The creator** sees the full result, as with any poll. A new private poll's banner says "Only you will see the result".
@@ -548,6 +549,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
       - The photo is checked by its bytes and cleaned before it's stored (`lib/images.ts`): JPEG EXIF (GPS, camera), XMP, IPTC, comments and extra pictures go, and the orientation comes back as a one-tag EXIF; PNG and WebP keep only the chunks that draw the image.
     - `GET /images/:id` → `200` the photo (its checked type, `nosniff`, `public, max-age=86400, s-maxage=86400, immutable`), or `404` (`no-store`) until a poll uses it.
   - `GET /polls/:id` → `200 {poll}`, closing the poll first if it's past its deadline; or `404`.
+    - With `pick` or `src` in the query (a newsletter vote link, growth 2026-11-01) → `307` to `/p/:id?pick=<A–D>&src=newsletter` (`no-store`), passing on only a valid letter and source. It reads and writes nothing, so it never votes.
   - `POST /polls/:id/votes` `{option}` → `201 {poll, account}`, or 400/404/409/410/415.
   - `POST /polls/:id/reports` `{}` → `201 {reported: true}`, or 400/404, 409 (already reported) and 415.
   - `GET /account` → `200 {account: {credits, countedVotes, publicPolls, votesToNextCredit}, plan: "free" | "pro"}`. It never sets a cookie. `plan` is new in M3.

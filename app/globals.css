@@ -357,6 +357,84 @@ button.link {
   margin: 0 0 0.75rem;
 }
 
+/* Opened from a newsletter's vote link (GROWTH.md, 2026-11-01): the pick preselected, and one "Confirm vote" */
+.confirm-pick p {
+  margin: 1rem 0 0.6rem;
+  font-size: 1.1rem;
+}
+
+.confirm-pick p.hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.9rem;
+}
+
+.face-button.chosen {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.2);
+}
+
+button.confirm {
+  width: 100%;
+}
+
+/* The creator's "Get votes from your newsletter" panel: the block's preview, the two copy buttons, the code */
+.newsletter h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.newsletter-preview {
+  display: block;
+  width: 100%;
+  height: 22rem;
+  margin: 0.75rem 0;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.newsletter-copy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.newsletter-copy button {
+  width: 100%;
+}
+
+.newsletter-copy .hint {
+  margin: 0.4rem 0 0;
+}
+
+.newsletter details {
+  margin-top: 0.75rem;
+}
+
+.newsletter summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.newsletter details label {
+  margin-top: 0.6rem;
+}
+
+.newsletter textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  font: 0.8rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+
+@media (max-width: 30rem) {
+  .newsletter-copy {
+    grid-template-columns: 1fr;
+  }
+}
+
 label.check {
   display: flex;
   gap: 0.6rem;

@@ -50,11 +50,18 @@ export interface Account {
   isNew: boolean
 }
 
+/**
+ * The anonymous id from the native app's header first, else the browser cookie's value; null if the one that
+ * counts is missing or malformed. Pages, which read the two apart (next/headers), use this directly.
+ */
+export function viewerOf(header: string | null, cookie: string | null | undefined): string | null {
+  if (header !== null) return isVoterId(header.trim()) ? header.trim() : null
+  return isVoterId(cookie) ? cookie : null
+}
+
 /** The caller's anonymous id: the native app's header first, else the browser cookie. */
 export function voterOf(request: Request): string | null {
-  const header = request.headers.get(VOTER_HEADER)
-  if (header !== null) return isVoterId(header.trim()) ? header.trim() : null
-  return readVoter(request.headers.get('cookie'))
+  return viewerOf(request.headers.get(VOTER_HEADER), readVoter(request.headers.get('cookie')))
 }
 
 /** The caller's account: the id from their header or cookie, or a fresh one. */

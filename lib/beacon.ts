@@ -39,6 +39,16 @@ export function refFor(search: string): string | null {
   return ref !== undefined && REF_PATTERN.test(ref) ? ref : null
 }
 
+/** Where a visit came from, when one of our links says so: `?src=newsletter` on a newsletter block's vote links. */
+export const SOURCES = ['newsletter'] as const
+export type Source = (typeof SOURCES)[number]
+
+/** The `src` of a page address, if it's one of SOURCES (exactly), else null. */
+export function sourceFor(search: string): Source | null {
+  const src = new URLSearchParams(search).get('src')
+  return SOURCES.find((s) => s === src) ?? null
+}
+
 /** document.referrer only when it comes from another origin; else null. */
 export function referrerFor(documentReferrer: string, origin: string): string | null {
   if (!documentReferrer) return null
@@ -56,11 +66,12 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
  * as text/plain so the browser needs no CORS preflight; the endpoint parses the JSON body. If storage is
  * unavailable, nothing is sent rather than repeating a once-only event.
  *
- * `path` is for the visits of pages counted apart (the thumbnail tools, lib/tools.ts): such a page's visit
- * carries it and is sent once per session for that page, even after the session's first visit; it also
- * counts as that first visit.
+ * `path` is for the visits of pages counted apart (the thumbnail tools, lib/tools.ts, and a poll page opened from
+ * a newsletter's vote link): such a page's visit carries it and is sent once per session for that page, even
+ * after the session's first visit; it also counts as that first visit. `source` says where such a visit came from
+ * (`newsletter`, app/visit-beacon.tsx).
  */
-export function sendSignal(kind: SignalKind, path?: string): void {
+export function sendSignal(kind: SignalKind, path?: string, source?: Source): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
     if (!shouldSend({ deployEnv: deployEnv(), webdriver: navigator.webdriver === true, optedOut })) return
@@ -75,7 +86,14 @@ export function sendSignal(kind: SignalKind, path?: string): void {
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
     const referrer = referrerFor(document.referrer, location.origin)
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer, ...(path ? { path } : {}), ...(ref === null ? {} : { ref }) })
+    const body = JSON.stringify({
+      slug: 'tiebreak',
+      kind,
+      referrer,
+      ...(path ? { path } : {}),
+      ...(path && source ? { source } : {}),
+      ...(ref === null ? {} : { ref }),
+    })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

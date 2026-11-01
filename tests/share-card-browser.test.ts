@@ -9,14 +9,11 @@
 // the page's fetch to the signal endpoint is answered inside the page and handed to the
 // test, and any request to RepoHQ that got past that would be aborted.
 //
-// Needs CHROMIUM_PATH (no browser is downloaded), and is skipped without it. The app gets
-// sample data only: the database and Stripe settings of this shell are dropped.
-import { spawn, type ChildProcess } from 'node:child_process'
-import { once } from 'node:events'
-import { createServer, type AddressInfo } from 'node:net'
-import { fileURLToPath } from 'node:url'
+// Needs CHROMIUM_PATH (no browser is downloaded), and is skipped without it. It runs on the shared dev server
+// (tests/browser-app.ts: sample data only, NEXT_PUBLIC_VERCEL_ENV=production). It used to start its own `next dev`,
+// which exits while the shared one holds the lock on .next/, so this file failed whenever CHROMIUM_PATH was set.
 import { chromium, devices, type Browser, type Page } from 'playwright-core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest'
 import { CARD, tileBoxes } from '@/lib/share-card'
 import { SIGNAL_URL } from '@/lib/site'
 import { orientationOnlyExif } from './image-bytes'
@@ -24,29 +21,7 @@ import { decodePng, inkIn, rgb, shareOf } from './png-pixels'
 
 const CHROMIUM = process.env.CHROMIUM_PATH
 const PHONE = devices['iPhone 13']
-const root = fileURLToPath(new URL('..', import.meta.url))
 const GREEN: [number, number, number] = [32, 160, 64]
-
-async function freePort() {
-  const server = createServer().listen(0)
-  await once(server, 'listening')
-  const { port } = server.address() as AddressInfo
-  server.close()
-  await once(server, 'close')
-  return port
-}
-
-async function waitForApp(base: string, app: ChildProcess) {
-  const deadline = Date.now() + 180_000
-  while (Date.now() < deadline) {
-    if (app.exitCode !== null) throw new Error('The dev server exited before it answered.')
-    try {
-      if ((await fetch(base)).ok) return
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-  }
-  throw new Error(`The dev server did not answer on ${base}`)
-}
 
 /** A photo from the browser's own encoder: one colour, as JPEG or WebP bytes. */
 async function encode(page: Page, type: 'image/jpeg' | 'image/webp', colour: [number, number, number]) {
@@ -78,9 +53,8 @@ function metaContent(html: string, key: string): string[] {
 }
 
 describe.skipIf(!CHROMIUM)('share cards and "Make your own tiebreak" in Chromium', () => {
-  let app: ChildProcess | undefined
   let browser: Browser | undefined
-  let base = ''
+  const base = inject('appBase')
 
   const post = async (path: string, body: BodyInit, type: string) =>
     fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': type }, body })
@@ -92,28 +66,6 @@ describe.skipIf(!CHROMIUM)('share cards and "Make your own tiebreak" in Chromium
   }
 
   beforeAll(async () => {
-    const port = await freePort()
-    base = `http://localhost:${port}`
-    // Sample data only: no real database or Stripe; and not vitest's NODE_ENV.
-    const env: NodeJS.ProcessEnv = { ...process.env, NEXT_TELEMETRY_DISABLED: '1', HOUSE_POLLS: 'off' }
-    for (const name of Object.keys(env)) {
-      const drop =
-        name === 'DATABASE_URL' ||
-        name === 'NODE_ENV' ||
-        name.startsWith('STRIPE_') ||
-        name.startsWith('VITEST') ||
-        name.endsWith('VERCEL_ENV')
-      if (drop) delete env[name]
-    }
-    env.NEXT_PUBLIC_VERCEL_ENV = 'production' // so the beacon runs; its requests never leave the browser (below)
-    const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port)], {
-      cwd: root,
-      detached: true,
-      stdio: 'ignore',
-      env,
-    })
-    app = server
-    await waitForApp(base, server)
     // The dev server compiles each route on its first request; do that now, not inside a test's timeout.
     await Promise.all([
       fetch(`${base}/p/AAAAAAAAAAAA`),
@@ -127,9 +79,6 @@ describe.skipIf(!CHROMIUM)('share cards and "Make your own tiebreak" in Chromium
 
   afterAll(async () => {
     await browser?.close()
-    try {
-      if (app?.pid) process.kill(-app.pid, 'SIGTERM')
-    } catch {}
   })
 
   it("a poll page's HTML points og:image and twitter:image at its own card, a 1200×630 PNG with the photo in it", { timeout: 180_000 }, async () => {

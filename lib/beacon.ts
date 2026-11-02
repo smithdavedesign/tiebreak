@@ -39,6 +39,16 @@ export function refFor(search: string): string | null {
   return ref !== undefined && REF_PATTERN.test(ref) ? ref : null
 }
 
+/** Where a link of ours says a visit comes from (`?src=`): a poll's newsletter links (lib/newsletter.ts). */
+export const SOURCES = ['newsletter'] as const
+export type Source = (typeof SOURCES)[number]
+
+/** The `src` of a page address when it's one of SOURCES (either case), else null, so nothing else is sent. */
+export function sourceFor(search: string): Source | null {
+  const src = new URLSearchParams(search).get('src')?.toLowerCase()
+  return SOURCES.find((s) => s === src) ?? null
+}
+
 /** document.referrer only when it comes from another origin; else null. */
 export function referrerFor(documentReferrer: string, origin: string): string | null {
   if (!documentReferrer) return null
@@ -59,8 +69,11 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
  * `path` is for the visits of pages counted apart (the thumbnail tools, lib/tools.ts): such a page's visit
  * carries it and is sent once per session for that page, even after the session's first visit; it also
  * counts as that first visit.
+ *
+ * `source` goes with a path: a poll page opened from one of its newsletter links sends its path and
+ * `source: "newsletter"` (app/visit-beacon.tsx), once per session for that poll.
  */
-export function sendSignal(kind: SignalKind, path?: string): void {
+export function sendSignal(kind: SignalKind, path?: string, source?: Source): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
     if (!shouldSend({ deployEnv: deployEnv(), webdriver: navigator.webdriver === true, optedOut })) return
@@ -75,7 +88,14 @@ export function sendSignal(kind: SignalKind, path?: string): void {
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
     const referrer = referrerFor(document.referrer, location.origin)
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer, ...(path ? { path } : {}), ...(ref === null ? {} : { ref }) })
+    const body = JSON.stringify({
+      slug: 'tiebreak',
+      kind,
+      referrer,
+      ...(path ? { path } : {}),
+      ...(ref === null ? {} : { ref }),
+      ...(path && source ? { source } : {}),
+    })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

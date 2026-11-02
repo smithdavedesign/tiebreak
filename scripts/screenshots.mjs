@@ -1,11 +1,11 @@
 // npm run screenshots: starts the app, drives the main job with Playwright at
 // desktop and phone size, saves PNGs to docs/screenshots/ and stops the app. Not
-// part of `npm test`. The flow: a seller posts a poll with a photo for each option;
-// its link unfurls as the poll's share card; a stranger opens the link, votes and is
-// offered "Make your own tiebreak", which opens the start page; two more votes close
-// the poll, and its card shows the winner and the split. The cards are images
-// (1200×630), so they're taken once, at desktop size. The sample photos are drawn in
-// the browser (two mugs), so no real photo is used.
+// part of `npm test`. The flow (vote from your newsletter): an author posts a poll
+// with three cover photos on the start page; the poll page offers them "Get votes
+// from your newsletter", with a preview of the email block and its two copy buttons;
+// a reader clicks option B in that block, as pasted into an email, and lands on the
+// poll with B picked and one "Confirm vote" button (no vote yet); confirming votes.
+// The sample covers are drawn in the browser, so no real photo is used.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -22,12 +22,15 @@ const outDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url))
 const port = Number(process.env.SCREENSHOT_PORT ?? 3187)
 const base = `http://localhost:${port}`
 
-const QUESTION = 'Which photo for my ceramic mug listing?'
-const OPTION_A = 'Speckled blue glaze, morning light'
-const OPTION_B = 'Matte white on a walnut shelf'
-const TARGET = 3
+const QUESTION = 'Which cover for The Salt Road?'
+const COVERS = [
+  { label: 'Teal waves', scene: 'waves' },
+  { label: 'Red sun', scene: 'sun' },
+  { label: 'Night ink', scene: 'stars' },
+]
+const TARGET = 20
 const SIZES = ['desktop', 'mobile']
-const SHOTS = ['card-open.png', 'card-result.png', ...['voted', 'home'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))]
+const SHOTS = ['newsletter', 'confirm', 'voted'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))
 
 if (!process.env.CHROMIUM_PATH) {
   console.error('Set CHROMIUM_PATH to a Chromium or Chrome binary (no browser is downloaded).')
@@ -70,85 +73,61 @@ async function waitForApp() {
   throw new Error('The dev server did not answer on ' + base)
 }
 
-/** A stranger's vote: no cookie, so the app mints them a fresh anonymous account. */
-async function strangerVotes(id, option) {
-  const res = await fetch(`${base}/polls/${id}/votes`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ option }),
-  })
-  if (res.status !== 201) throw new Error(`Stranger vote failed: ${res.status}`)
-}
-
 /**
- * Two sample product photos, drawn on a canvas in the page and encoded as JPEG the
- * way a phone's photo would arrive: a speckled blue mug in morning light, and a
- * matte white mug on a walnut shelf.
+ * Three sample book covers for a made-up novel, drawn on a canvas in the page and
+ * encoded as JPEG the way a phone's photo would arrive: teal waves, a red sun, and
+ * stars on dark ink.
  */
-async function samplePhotos(page) {
-  const encoded = await page.evaluate(async () => {
+async function sampleCovers(page) {
+  const encoded = await page.evaluate(async (scenes) => {
     const draw = (scene) => {
-      const size = 900
+      const [w, h] = [600, 900]
       const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
+      canvas.width = w
+      canvas.height = h
       const ctx = canvas.getContext('2d')
-      const wall = ctx.createLinearGradient(0, 0, size, size)
-      wall.addColorStop(0, scene.wall[0])
-      wall.addColorStop(1, scene.wall[1])
-      ctx.fillStyle = wall
-      ctx.fillRect(0, 0, size, size)
-      // The surface the mug stands on.
-      ctx.fillStyle = scene.surface
-      ctx.fillRect(0, 640, size, 260)
-      if (scene.grain) {
-        ctx.strokeStyle = 'rgba(30, 15, 5, 0.35)'
-        ctx.lineWidth = 3
-        for (let y = 660; y < size; y += 26) {
+      const palette = {
+        waves: { bg: ['#0f5d66', '#1b8a8f'], ink: '#f4efe6', accent: '#9fd8cf' },
+        sun: { bg: ['#f3d9b1', '#e9b37a'], ink: '#4a1712', accent: '#b8322a' },
+        stars: { bg: ['#14142b', '#2b2d5c'], ink: '#f1e9d2', accent: '#e8c46a' },
+      }[scene]
+      const sky = ctx.createLinearGradient(0, 0, 0, h)
+      sky.addColorStop(0, palette.bg[0])
+      sky.addColorStop(1, palette.bg[1])
+      ctx.fillStyle = sky
+      ctx.fillRect(0, 0, w, h)
+      ctx.strokeStyle = palette.accent
+      ctx.fillStyle = palette.accent
+      if (scene === 'waves') {
+        ctx.lineWidth = 10
+        for (let y = 520; y < h; y += 46) {
           ctx.beginPath()
-          ctx.moveTo(0, y)
-          ctx.bezierCurveTo(300, y - 12, 600, y + 14, size, y - 4)
+          for (let x = 0; x <= w; x += 10) ctx.lineTo(x, y + Math.sin((x + y) / 45) * 16)
           ctx.stroke()
         }
-      }
-      // Shadow, handle, body and rim.
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)'
-      ctx.beginPath()
-      ctx.ellipse(470, 668, 250, 34, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.lineWidth = 46
-      ctx.strokeStyle = scene.mug[1]
-      ctx.beginPath()
-      ctx.ellipse(630, 450, 95, 120, 0, -Math.PI / 2, Math.PI / 2)
-      ctx.stroke()
-      const body = ctx.createLinearGradient(250, 0, 640, 0)
-      body.addColorStop(0, scene.mug[1])
-      body.addColorStop(0.45, scene.mug[0])
-      body.addColorStop(1, scene.mug[1])
-      ctx.fillStyle = body
-      ctx.beginPath()
-      ctx.moveTo(250, 290)
-      ctx.lineTo(250, 610)
-      ctx.quadraticCurveTo(250, 665, 310, 665)
-      ctx.lineTo(580, 665)
-      ctx.quadraticCurveTo(640, 665, 640, 610)
-      ctx.lineTo(640, 290)
-      ctx.closePath()
-      ctx.fill()
-      ctx.fillStyle = scene.rim
-      ctx.beginPath()
-      ctx.ellipse(445, 290, 195, 38, 0, 0, Math.PI * 2)
-      ctx.fill()
-      if (scene.speckles) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
-        for (let i = 0; i < 260; i++) {
-          const x = 262 + ((i * 97) % 366)
-          const y = 330 + ((i * 53) % 320)
+      } else if (scene === 'sun') {
+        ctx.beginPath()
+        ctx.arc(w / 2, 560, 170, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = palette.ink
+        ctx.fillRect(0, 700, w, 200)
+      } else {
+        for (let i = 0; i < 90; i++) {
           ctx.beginPath()
-          ctx.arc(x, y, 2 + (i % 4), 0, Math.PI * 2)
+          ctx.arc((i * 137) % w, 380 + ((i * 89) % 500), 2 + (i % 3), 0, Math.PI * 2)
           ctx.fill()
         }
+        ctx.beginPath()
+        ctx.arc(430, 470, 60, 0, Math.PI * 2)
+        ctx.fill()
       }
+      ctx.fillStyle = palette.ink
+      ctx.textAlign = 'center'
+      ctx.font = 'bold 76px Georgia, serif'
+      ctx.fillText('THE SALT', w / 2, 170)
+      ctx.fillText('ROAD', w / 2, 255)
+      ctx.font = 'italic 34px Georgia, serif'
+      ctx.fillText('a novel', w / 2, 320)
       return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88))
     }
     const toBase64 = async (blob) => {
@@ -156,23 +135,11 @@ async function samplePhotos(page) {
       for (const byte of new Uint8Array(await blob.arrayBuffer())) binary += String.fromCharCode(byte)
       return btoa(binary)
     }
-    const blue = await draw({
-      wall: ['#fff3dc', '#f4d9b0'],
-      surface: '#efe6da',
-      mug: ['#4f86d9', '#1f4f9e'],
-      rim: '#183f80',
-      speckles: true,
-    })
-    const white = await draw({
-      wall: ['#e7e3dc', '#cfc8bd'],
-      surface: '#6b4325',
-      grain: true,
-      mug: ['#fbfaf7', '#d9d5cd'],
-      rim: '#c9c4ba',
-    })
-    return { a: await toBase64(blue), b: await toBase64(white) }
-  })
-  return { a: Buffer.from(encoded.a, 'base64'), b: Buffer.from(encoded.b, 'base64') }
+    const out = []
+    for (const scene of scenes) out.push(await toBase64(await draw(scene)))
+    return out
+  }, COVERS.map((c) => c.scene))
+  return encoded.map((b64) => Buffer.from(b64, 'base64'))
 }
 
 const allLoaded = (images) => images.evaluateAll((els) => els.every((el) => el.complete && el.naturalWidth > 0))
@@ -191,65 +158,67 @@ async function waitForImages(page, selector) {
   for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
 }
 
-/** A poll's share card, opened as an image (what a chat app or social site shows for the link). */
-async function shotOfCard(page, path, file) {
-  const res = await page.goto(`${base}${path}`)
-  if (res?.status() !== 200 || res.headers()['content-type'] !== 'image/png') {
-    throw new Error(`The card at ${path} answered ${res?.status()} ${res?.headers()['content-type']}`)
-  }
-  await page.screenshot({ path: `${outDir}${file}` })
+/** The email block as a reader's inbox shows it: pasted under a line of the author's own. */
+function inbox(block) {
+  return `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">
+<body style="margin:0;background:#f2f2f2;font-family:Georgia,serif;color:#1d1d1f">
+<div style="max-width:640px;margin:0 auto;background:#fff;padding:20px">
+<p style="font-size:17px;line-height:1.5">I'm down to three covers for The Salt Road. Which one would you pick up?</p>
+${block}
+</div></body>`
 }
 
 async function run(browser, label, contextOptions) {
-  const desktop = label === 'desktop'
-
-  // 1. A seller posts a poll with a photo for each option (the main job).
-  const seller = await browser.newContext(contextOptions)
-  const page = await seller.newPage()
+  // 1. An author posts a poll with three cover photos on the start page (the main job).
+  const author = await browser.newContext(contextOptions)
+  const page = await author.newPage()
   await page.goto(base)
   await page.getByLabel('Option A text').waitFor()
+  await page.getByRole('button', { name: '+ Add option' }).click()
   await page.getByLabel('Question').fill(QUESTION)
-  await page.getByLabel('Option A text').fill(OPTION_A)
-  await page.getByLabel('Option B text').fill(OPTION_B)
+  const covers = await sampleCovers(page)
+  for (const [i, cover] of COVERS.entries()) {
+    const letter = 'ABC'[i]
+    await page.getByLabel(`Option ${letter} text`).fill(cover.label)
+    await page.getByLabel(`Option ${letter} photo`).setInputFiles({ name: `cover-${cover.scene}.jpg`, mimeType: 'image/jpeg', buffer: covers[i] })
+  }
   await page.getByLabel('Close at').fill(String(TARGET))
-  const photos = await samplePhotos(page)
-  await page.getByLabel('Option A photo').setInputFiles({ name: 'speckled-blue-mug.jpg', mimeType: 'image/jpeg', buffer: photos.a })
-  await page.getByLabel('Option B photo').setInputFiles({ name: 'white-mug-walnut.jpg', mimeType: 'image/jpeg', buffer: photos.b })
-  await page.locator('img.thumb').nth(1).waitFor()
+  await page.locator('img.thumb').nth(2).waitFor()
   await page.getByRole('button', { name: 'Create poll' }).click()
   await page.waitForURL(/\/p\/[^/?]+/)
   await page.getByText('Your poll is live').waitFor()
   const id = new URL(page.url()).pathname.split('/').pop()
 
-  // 2. What its link unfurls as: the poll's own card, the question and both photos.
-  if (desktop) await shotOfCard(page, `/p/${id}/card?v=open`, 'card-open.png')
+  // 2. Their poll page offers "Get votes from your newsletter": the email block's preview and two copy buttons.
+  const panel = page.getByRole('region', { name: 'Get votes from your newsletter' })
+  await panel.waitFor()
+  const preview = page.frameLocator('iframe.newsletter-preview')
+  await preview.locator('img').nth(2).waitFor()
+  await waitForImages(page, '.newsletter-preview')
+  await page.waitForTimeout(300) // the frame takes its content's height on load
+  await shot(page, `newsletter-${label}.png`, { from: panel })
+  const block = await page.getByLabel('Email block (HTML)').inputValue()
 
-  // 3. A stranger opens the shared link (no cookie: a new anonymous account), picks
-  // one, and is offered a poll of their own.
-  const stranger = await browser.newContext(contextOptions)
-  const voter = await stranger.newPage()
-  await voter.goto(`${base}/p/${id}`)
-  await waitForImages(voter, '.swipe-card img')
-  await voter.getByRole('button', { name: 'Pick A' }).click()
-  const makeYourOwn = voter.getByRole('link', { name: 'Make your own tiebreak' })
-  await makeYourOwn.waitFor()
-  await shot(voter, `voted-${label}.png`)
+  // 3. A reader taps option B in the email; the link opens the poll with B picked, and nothing is voted yet.
+  const readerContext = await browser.newContext(contextOptions)
+  const reader = await readerContext.newPage()
+  await reader.setContent(inbox(block))
+  await reader.getByRole('link', { name: /Vote B/ }).click()
+  await reader.waitForURL(`${base}/p/${id}?pick=B&src=newsletter`)
+  const confirm = reader.getByRole('button', { name: 'Confirm vote' })
+  await confirm.waitFor()
+  await waitForImages(reader, '.confirm-pick img')
+  const before = await (await fetch(`${base}/polls/${id}`)).json()
+  if (before.poll.voteCount !== 0) throw new Error(`Opening the link voted: ${before.poll.voteCount} votes`)
+  await shot(reader, `confirm-${label}.png`, label === 'mobile' ? { from: reader.locator('.confirm-pick') } : {})
 
-  // 4. The link opens the start page, tagged ?ref=poll for the visit counter.
-  await makeYourOwn.click()
-  await voter.waitForURL(`${base}/?ref=poll`)
-  await voter.getByLabel('Question').waitFor()
-  await shot(voter, `home-${label}.png`)
+  // 4. Confirming records the vote.
+  await confirm.click()
+  await reader.getByText('You picked').waitFor()
+  await shot(reader, `voted-${label}.png`)
 
-  // 5. Two more strangers vote; the poll closes at 3, and its card shows the winner and the split.
-  if (desktop) {
-    await strangerVotes(id, 0)
-    await strangerVotes(id, 1)
-    await shotOfCard(page, `/p/${id}/card?v=closed`, 'card-result.png')
-  }
-
-  await stranger.close()
-  await seller.close()
+  await readerContext.close()
+  await author.close()
 }
 
 /** This script owns docs/screenshots/: PNGs from older runs that it no longer takes go. */

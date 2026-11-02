@@ -357,6 +357,84 @@ button.link {
   margin: 0 0 0.75rem;
 }
 
+/* A newsletter link's landing (?pick=): the picked option, changeable, and one Confirm vote */
+.confirm-pick fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.confirm-pick legend {
+  padding: 0;
+  font-weight: 500;
+}
+
+.confirm-pick .grid {
+  margin: 0.75rem 0 1rem;
+}
+
+label.pick-option {
+  display: block;
+  border-radius: 0.7rem;
+  cursor: pointer;
+}
+
+label.pick-option.chosen {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+label.pick-option:focus-within {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+button.confirm {
+  width: 100%;
+}
+
+/* The creator's "Get votes from your newsletter" panel */
+.newsletter h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.newsletter-preview {
+  display: block;
+  width: 100%;
+  height: 20rem;
+  margin: 0.75rem 0;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.copy-block {
+  margin-top: 1rem;
+}
+
+.copy-block .hint {
+  margin: 0.4rem 0;
+}
+
+.copy-block summary {
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.copy-block textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  font: 0.8rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  resize: vertical;
+}
+
 label.check {
   display: flex;
   gap: 0.6rem;

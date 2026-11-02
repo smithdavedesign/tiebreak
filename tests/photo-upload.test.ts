@@ -29,6 +29,7 @@ vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) => (cookie && name === 'tb_voter' ? { name, value: cookie } : undefined),
   }),
+  headers: async () => new Headers(),
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),

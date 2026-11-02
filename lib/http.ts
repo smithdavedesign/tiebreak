@@ -52,9 +52,13 @@ export interface Account {
 
 /** The caller's anonymous id: the native app's header first, else the browser cookie. */
 export function voterOf(request: Request): string | null {
-  const header = request.headers.get(VOTER_HEADER)
+  return voterFrom(request.headers.get(VOTER_HEADER), readVoter(request.headers.get('cookie')))
+}
+
+/** voterOf's rule, from the header's and the cookie's values (a page reads them with next/headers). */
+export function voterFrom(header: string | null, cookie: string | null | undefined): string | null {
   if (header !== null) return isVoterId(header.trim()) ? header.trim() : null
-  return readVoter(request.headers.get('cookie'))
+  return isVoterId(cookie) ? cookie : null
 }
 
 /** The caller's account: the id from their header or cookie, or a fresh one. */

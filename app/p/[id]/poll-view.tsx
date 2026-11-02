@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AccountView } from '@/lib/credits'
+import { emailHtml, postHtml, postMarkdown } from '@/lib/newsletter'
 import type { Plan } from '@/lib/plans'
-import type { PollView as Poll } from '@/lib/polls'
+import type { Option, PollView as Poll } from '@/lib/polls'
 import { CreditMeter, Face, LETTERS, Picker, ReportButton, labelOf } from '@/app/poll-parts'
 
 const TICK_MS = 30_000
@@ -16,8 +17,23 @@ const CREATED_NOTICE: Record<Poll['visibility'], string> = {
   private: 'Your private poll is live. Only you will see the result. Share the link below to collect votes.',
 }
 
-/** `plan` is the viewer's, and only matters when they created the poll (CSV export). */
-export function PollView({ initial, justCreated, plan }: { initial: Poll; justCreated: boolean; plan: Plan }) {
+/**
+ * `plan` is the viewer's, and only matters when they created the poll (CSV export). `picked` is the option a
+ * newsletter link chose (`?pick=`), or null. `siteUrl` is the newsletter links' origin until this page knows its own.
+ */
+export function PollView({
+  initial,
+  justCreated,
+  plan,
+  picked,
+  siteUrl,
+}: {
+  initial: Poll
+  justCreated: boolean
+  plan: Plan
+  picked: number | null
+  siteUrl: string
+}) {
   const [poll, setPoll] = useState(initial)
   // The voter's credits, known once they vote here (the vote response carries them).
   const [account, setAccount] = useState<AccountView | null>(null)
@@ -84,8 +100,11 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
           : `Closed with ${poll.voteCount} ${poll.voteCount === 1 ? 'vote' : 'votes'}`}
       </p>
 
-      {open && poll.myVote === null && (
+      {open && poll.myVote === null && picked === null && (
         <Picker options={poll.options} onPick={vote} disabled={busy} />
+      )}
+      {open && poll.myVote === null && picked !== null && (
+        <ConfirmPick options={poll.options} initial={picked} onConfirm={vote} disabled={busy} />
       )}
       {open && poll.myVote !== null && (
         <div className="card">
@@ -113,6 +132,7 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
       )}
       {account && !poll.mine && <CreditMeter account={account} feedLink />}
       <ShareLink id={poll.id} />
+      {open && poll.mine && <NewsletterPanel poll={poll} siteUrl={siteUrl} />}
       {!poll.mine && (
         <p className="report-row">
           <ReportButton pollId={poll.id} />
@@ -206,6 +226,185 @@ function MakeYourOwn() {
       <a className="button" href="/?ref=poll">
         Make your own tiebreak
       </a>
+    </div>
+  )
+}
+
+/**
+ * A newsletter link's landing (`?pick=B`): B is picked, not voted for. Inbox link scanners and prefetchers open
+ * links too, so only "Confirm vote" votes, and the reader can change the pick first.
+ */
+function ConfirmPick({
+  options,
+  initial,
+  onConfirm,
+  disabled,
+}: {
+  options: Option[]
+  initial: number
+  onConfirm: (option: number) => void
+  disabled: boolean
+}) {
+  const [choice, setChoice] = useState(initial)
+  return (
+    <div className="card confirm-pick">
+      <fieldset>
+        <legend>
+          Your pick is <b>{LETTERS[choice]}</b>. Tap another option to change it.
+        </legend>
+        <div className="grid">
+          {options.map((option, i) => (
+            <label key={i} className={`face-button pick-option${i === choice ? ' chosen' : ''}`}>
+              <input
+                type="radio"
+                name="pick"
+                value={i}
+                className="visually-hidden"
+                checked={i === choice}
+                disabled={disabled}
+                onChange={() => setChoice(i)}
+              />
+              <Face option={option} index={i} />
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <button type="button" className="confirm" disabled={disabled} onClick={() => onConfirm(choice)}>
+        Confirm vote
+      </button>
+    </div>
+  )
+}
+
+/**
+ * The creator's newsletter blocks (lib/newsletter.ts), while the poll is open: one link per option, each opening
+ * this poll with that option picked. Above them, the email block as an inbox shows it.
+ */
+function NewsletterPanel({ poll, siteUrl }: { poll: Poll; siteUrl: string }) {
+  // The links point where this page is, like the share link (a preview deployment's polls live there).
+  const [origin, setOrigin] = useState(siteUrl)
+  const [copied, setCopied] = useState<'email' | 'post' | null>(null)
+  useEffect(() => setOrigin(window.location.origin), [])
+  const email = emailHtml(poll, origin)
+
+  return (
+    <section className="card newsletter" aria-labelledby="newsletter-title">
+      <h2 id="newsletter-title">Get votes from your newsletter</h2>
+      <p className="hint">
+        Paste a block into your next email or post. Each option links to its own vote: a reader taps their pick, then
+        confirms it here, so link checkers in inboxes can&apos;t vote for anyone.
+      </p>
+      <EmailPreview html={email} />
+      <CopyBlock
+        action="Copy email block (HTML)"
+        label="Email block (HTML)"
+        format="HTML"
+        plain={email}
+        html={email}
+        copied={copied === 'email'}
+        onCopied={() => setCopied('email')}
+      >
+        A table of the options for email: paste it into your email tool&apos;s HTML block, or into an email you&apos;re
+        writing.
+      </CopyBlock>
+      <CopyBlock
+        action="Copy Substack block (Markdown)"
+        label="Substack block (Markdown)"
+        format="Markdown"
+        plain={postMarkdown(poll, origin)}
+        html={postHtml(poll, origin)}
+        copied={copied === 'post'}
+        onCopied={() => setCopied('post')}
+      >
+        An image and a link per option: paste it into a Substack post, or anywhere that takes Markdown.
+      </CopyBlock>
+    </section>
+  )
+}
+
+/**
+ * The email block as an inbox shows it. The frame runs no scripts (an empty sandbox but for same-origin, so its
+ * height can be read) and takes no clicks or focus (inert); the block's text is escaped in lib/newsletter.ts too.
+ */
+function EmailPreview({ html }: { html: string }) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  useEffect(() => {
+    const el = frame.current
+    if (!el) return
+    const fit = () => {
+      const doc = el.contentDocument
+      if (doc?.body) el.style.height = `${doc.documentElement.scrollHeight}px`
+    }
+    fit()
+    el.addEventListener('load', fit)
+    return () => el.removeEventListener('load', fit)
+  }, [html])
+  return (
+    <iframe
+      ref={frame}
+      className="newsletter-preview"
+      title="Preview of the email block"
+      sandbox="allow-same-origin"
+      inert
+      srcDoc={`<!doctype html><meta name="referrer" content="no-referrer"><body style="margin:0;padding:12px;background:#fff">${html}</body>`}
+    />
+  )
+}
+
+/**
+ * One block's copy button. The clipboard gets the block's text and its HTML: editors that take rich text paste the
+ * HTML, plain boxes the text. Without clipboard access, the text shows selected, to copy by hand.
+ */
+function CopyBlock({
+  action,
+  label,
+  format,
+  plain,
+  html,
+  copied,
+  onCopied,
+  children,
+}: {
+  action: string
+  label: string
+  format: string
+  plain: string
+  html: string
+  copied: boolean
+  onCopied: () => void
+  children: ReactNode
+}) {
+  const details = useRef<HTMLDetailsElement>(null)
+  const area = useRef<HTMLTextAreaElement>(null)
+
+  async function copy() {
+    try {
+      if (typeof ClipboardItem === 'undefined') {
+        await navigator.clipboard.writeText(plain)
+      } else {
+        const item = new ClipboardItem({
+          'text/plain': new Blob([plain], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' }),
+        })
+        await navigator.clipboard.write([item])
+      }
+      onCopied()
+    } catch {
+      if (details.current) details.current.open = true
+      area.current?.select()
+    }
+  }
+
+  return (
+    <div className="copy-block">
+      <button type="button" onClick={() => void copy()}>
+        {copied ? 'Copied' : action}
+      </button>
+      <p className="hint">{children}</p>
+      <details ref={details}>
+        <summary>Show the {format}</summary>
+        <textarea ref={area} readOnly rows={8} value={plain} aria-label={label} onFocus={(e) => e.target.select()} />
+      </details>
     </div>
   )
 }

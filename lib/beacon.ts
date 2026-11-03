@@ -58,15 +58,17 @@ export function referrerFor(documentReferrer: string, origin: string): string | 
  *
  * `path` is for the visits of pages counted apart (the thumbnail tools, lib/tools.ts): such a page's visit
  * carries it and is sent once per session for that page, even after the session's first visit; it also
- * counts as that first visit.
+ * counts as that first visit. `source` goes with it on a poll page opened from a newsletter block's link
+ * (lib/newsletter.ts), counted once per session for each poll and source.
  */
-export function sendSignal(kind: SignalKind, path?: string): void {
+export function sendSignal(kind: SignalKind, path?: string, source?: string): void {
   try {
     const optedOut = localStorage.getItem(NOTRACK_KEY) !== null
     if (!shouldSend({ deployEnv: deployEnv(), webdriver: navigator.webdriver === true, optedOut })) return
     const ref = kind === 'visit' ? refFor(location.search) : null
     if (kind === 'visit') {
-      const key = path ? `${VISITED_KEY}:${path}` : ref === null ? VISITED_KEY : `${VISITED_KEY}:${ref}`
+      const pageKey = source ? `${path}:${source}` : path
+      const key = pageKey ? `${VISITED_KEY}:${pageKey}` : ref === null ? VISITED_KEY : `${VISITED_KEY}:${ref}`
       if (sessionStorage.getItem(key)) return
       sessionStorage.setItem(key, '1')
       sessionStorage.setItem(VISITED_KEY, '1') // a tool's or a tagged visit is this session's visit too
@@ -75,7 +77,14 @@ export function sendSignal(kind: SignalKind, path?: string): void {
       localStorage.setItem(ACTIVATED_KEY, '1')
     }
     const referrer = referrerFor(document.referrer, location.origin)
-    const body = JSON.stringify({ slug: 'tiebreak', kind, referrer, ...(path ? { path } : {}), ...(ref === null ? {} : { ref }) })
+    const body = JSON.stringify({
+      slug: 'tiebreak',
+      kind,
+      referrer,
+      ...(path ? { path } : {}),
+      ...(source ? { source } : {}),
+      ...(ref === null ? {} : { ref }),
+    })
     fetch(SIGNAL_URL, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {})
   } catch {
     // Storage blocked or fetch unavailable: the product matters more than the count.

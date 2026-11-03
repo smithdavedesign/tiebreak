@@ -357,6 +357,126 @@ button.link {
   margin: 0 0 0.75rem;
 }
 
+/* Vote from your newsletter (GROWTH.md, 2026-11-03): a link's confirm step, and the creator's panel */
+.confirm-pick {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.confirm-pick p,
+.confirm-pick .grid {
+  margin: 0;
+}
+
+.confirm-pick button {
+  justify-self: start;
+  min-width: 12rem;
+}
+
+/* All the options in one row on a computer; two across on a phone */
+.confirm-pick .grid.options-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.confirm-pick .grid.options-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+label.pick-option {
+  position: relative;
+  display: block;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0.2rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+label.pick-option:has(input:checked) {
+  border-color: var(--accent);
+  background: #fff4f0;
+}
+
+label.pick-option:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.newsletter h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.newsletter p {
+  margin: 0 0 0.75rem;
+}
+
+.newsletter-preview {
+  display: block;
+  width: 100%;
+  height: 16rem;
+  margin: 0 0 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.copy-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.copy-block {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  justify-items: start;
+}
+
+.copy-block p {
+  margin: 0;
+}
+
+.copy-block details {
+  justify-self: stretch;
+  font-size: 0.9rem;
+}
+
+.copy-block summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.copy-block textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  font: 0.75rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  resize: vertical;
+}
+
+@media (max-width: 40rem) {
+  .copy-blocks {
+    grid-template-columns: 1fr;
+  }
+
+  .confirm-pick .grid.options-3,
+  .confirm-pick .grid.options-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .confirm-pick button {
+    justify-self: stretch;
+  }
+}
+
 label.check {
   display: flex;
   gap: 0.6rem;

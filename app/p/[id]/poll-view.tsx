@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AccountView } from '@/lib/credits'
+import { optionName } from '@/lib/newsletter'
 import type { Plan } from '@/lib/plans'
-import type { PollView as Poll } from '@/lib/polls'
+import type { Option, PollView as Poll } from '@/lib/polls'
 import { CreditMeter, Face, LETTERS, Picker, ReportButton, labelOf } from '@/app/poll-parts'
+import { NewsletterPanel } from './newsletter-panel'
 
 const TICK_MS = 30_000
 const MINUTE_MS = 60_000
@@ -16,8 +18,23 @@ const CREATED_NOTICE: Record<Poll['visibility'], string> = {
   private: 'Your private poll is live. Only you will see the result. Share the link below to collect votes.',
 }
 
-/** `plan` is the viewer's, and only matters when they created the poll (CSV export). */
-export function PollView({ initial, justCreated, plan }: { initial: Poll; justCreated: boolean; plan: Plan }) {
+/**
+ * `plan` is the viewer's, and only matters when they created the poll (CSV export). `picked` is the option a
+ * newsletter link preselected (`?pick=`), or null. `origin` is this site's address, for the newsletter blocks.
+ */
+export function PollView({
+  initial,
+  justCreated,
+  plan,
+  picked,
+  origin,
+}: {
+  initial: Poll
+  justCreated: boolean
+  plan: Plan
+  picked: number | null
+  origin: string
+}) {
   const [poll, setPoll] = useState(initial)
   // The voter's credits, known once they vote here (the vote response carries them).
   const [account, setAccount] = useState<AccountView | null>(null)
@@ -57,6 +74,8 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
         const body = await res.json()
         setPoll(body.poll)
         setAccount(body.account)
+        // Drop ?pick=&src=, so an address bar copied after voting neither preselects nor counts as a newsletter visit.
+        if (picked !== null) window.history.replaceState(null, '', `/p/${poll.id}`)
         return
       }
       if (res.status === 409) setNotice('You already voted on this poll.')
@@ -84,8 +103,11 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
           : `Closed with ${poll.voteCount} ${poll.voteCount === 1 ? 'vote' : 'votes'}`}
       </p>
 
-      {open && poll.myVote === null && (
+      {open && poll.myVote === null && picked === null && (
         <Picker options={poll.options} onPick={vote} disabled={busy} />
+      )}
+      {open && poll.myVote === null && picked !== null && (
+        <ConfirmPick options={poll.options} picked={picked} onConfirm={vote} disabled={busy} />
       )}
       {open && poll.myVote !== null && (
         <div className="card">
@@ -113,6 +135,7 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
       )}
       {account && !poll.mine && <CreditMeter account={account} feedLink />}
       <ShareLink id={poll.id} />
+      {open && poll.mine && <NewsletterPanel poll={poll} origin={origin} />}
       {!poll.mine && (
         <p className="report-row">
           <ReportButton pollId={poll.id} />
@@ -139,6 +162,58 @@ function timeLeft(ms: number) {
   const hours = Math.floor(minutes / 60)
   if (hours < 48) return `${hours}h ${minutes % 60}m left`
   return `${Math.floor(hours / 24)}d ${hours % 24}h left`
+}
+
+/**
+ * A newsletter link's landing: the option it named, preselected, and one button that casts the vote. Opening the
+ * page sends nothing; the reader can pick another option before confirming.
+ */
+function ConfirmPick({
+  options,
+  picked,
+  onConfirm,
+  disabled,
+}: {
+  options: Option[]
+  picked: number
+  onConfirm: (option: number) => void
+  disabled: boolean
+}) {
+  const [choice, setChoice] = useState(picked)
+  return (
+    <form
+      className="confirm-pick"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onConfirm(choice)
+      }}
+    >
+      <p>
+        Your pick: <b>{optionName(options[choice], choice)}</b>
+      </p>
+      <button type="submit" disabled={disabled}>
+        Confirm vote
+      </button>
+      <p className="hint">Nothing counts until you confirm. Tap another option to change your pick.</p>
+      <div className={`grid options-${options.length}`} role="radiogroup" aria-label="Your pick">
+        {options.map((option, i) => (
+          <label key={i} className="pick-option">
+            <input
+              type="radio"
+              name="pick"
+              className="visually-hidden"
+              value={i}
+              checked={choice === i}
+              disabled={disabled}
+              aria-label={optionName(option, i)}
+              onChange={() => setChoice(i)}
+            />
+            <Face option={option} index={i} />
+          </label>
+        ))}
+      </div>
+    </form>
+  )
 }
 
 function Result({ poll }: { poll: Poll }) {

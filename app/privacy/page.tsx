@@ -55,7 +55,9 @@ export default function PrivacyPage() {
         session), an &ldquo;activate&rdquo; (the first time you create a poll in this browser) and a &ldquo;checkout&rdquo;
         (when you click the button to buy Pro). Each carries only the page that linked you here, if it was another site and
         your browser shares it. A visit to one of the free thumbnail tools also says which tool page it was, and is counted
-        once per session for each. A link of ours can carry a short tag, like <code>ref=poll</code> on &ldquo;Make your own
+        once per session for each. So does a poll page opened from a link in a creator&apos;s newsletter block
+        (<code>src=newsletter</code>): its visit names that poll&apos;s page and says it came from a newsletter, once per
+        session for each poll. A link of ours can carry a short tag, like <code>ref=poll</code> on &ldquo;Make your own
         tiebreak&rdquo; under a poll you voted on; following one sends one more visit with that tag, so we can tell which
         links bring people. No cookie is set and no id is sent. The counter stores a one-way hash of your IP address
         with the event, never the address itself, so it can limit spam to a few counts an hour. Nothing is sent from

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AccountView } from '@/lib/credits'
 import type { Plan } from '@/lib/plans'
 import type { PollView as Poll } from '@/lib/polls'
+import { hasResultPage, resultPath } from '@/lib/results'
 import { CreditMeter, Face, LETTERS, Picker, ReportButton, labelOf } from '@/app/poll-parts'
 
 const TICK_MS = 30_000
@@ -15,6 +16,7 @@ const CREATED_NOTICE: Record<Poll['visibility'], string> = {
   public: 'Your poll is live in the public feed. Share the link below to get votes faster.',
   private: 'Your private poll is live. Only you will see the result. Share the link below to collect votes.',
 }
+const PUBLISH_NOTICE = ' When it closes, its result gets a public page, titled with your question.'
 
 /** `plan` is the viewer's, and only matters when they created the poll (CSV export). */
 export function PollView({ initial, justCreated, plan }: { initial: Poll; justCreated: boolean; plan: Plan }) {
@@ -76,7 +78,12 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
   const resultHidden = poll.visibility === 'private' && !poll.mine
   return (
     <section>
-      {justCreated && <p className="notice">{CREATED_NOTICE[poll.visibility]}</p>}
+      {justCreated && (
+        <p className="notice">
+          {CREATED_NOTICE[poll.visibility]}
+          {poll.publishResult && PUBLISH_NOTICE}
+        </p>
+      )}
       <h1>{poll.question || 'Which one?'}</h1>
       <p className="hint">
         {open
@@ -103,6 +110,11 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
         </div>
       )}
       {!open && (resultHidden ? <PrivateResult poll={poll} /> : <Result poll={poll} />)}
+      {hasResultPage(poll) && (
+        <p className="hint">
+          The result is published: <a href={resultPath(poll)}>{poll.question}</a>
+        </p>
+      )}
       {!open && poll.mine && <Export id={poll.id} plan={plan} />}
       {!poll.mine && (poll.myVote !== null || !open) && <MakeYourOwn />}
 

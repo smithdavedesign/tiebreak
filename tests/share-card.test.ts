@@ -418,6 +418,7 @@ describe('text that would overflow (4 options, a 200-character question, no imag
     options,
     target: 10,
     visibility: 'unlisted',
+    publishResult: false,
     status: 'open',
     winner: null,
     voteCount: 4,

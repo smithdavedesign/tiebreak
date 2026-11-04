@@ -499,6 +499,8 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - Pro accounts get a second checkbox, "Keep the result private: only you see the winner and the split (Pro)". Ticking it turns the public box off.
     - Free accounts see "Want the result kept private, or every vote in a spreadsheet? Get Pro" instead.
   - Creating a poll takes you to its share page.
+  - **New (growth, 2026-11-04):** a checkbox, "Publish the result when it closes", off by default and disabled while "Keep the result private" is ticked. Ticked, the question becomes required.
+- **`/results/<slug>`** (growth, 2026-11-04; see GROWTH.md): the public result page of a closed poll whose creator ticked that box. `<slug>` is the question's words and the poll id. Titled with the question; the winner (or the tie), every option's votes and share, "Make your own tiebreak" (`/?ref=result`) and Report. 404 for open, un-opted, private, vote-less and 3-times-reported polls; another slug for the same poll 308s to its own. `/sitemap.xml` lists every one. The closed poll's `/p/:id` page links to it.
 - **`/tools/etsy-thumbnail-preview`, `/tools/book-cover-thumbnail-test`, `/tools/youtube-thumbnail-preview`** (growth, 2026-10-22; see GROWTH.md): free preview tools.
   - Add 2–4 JPEG, PNG or WebP images and see them side by side, drawn in the browser with nothing uploaded: Etsy search-grid tiles at 1:1, 4:3 and 5:4; book covers at about 160 and 80 px tall; YouTube tiles at 16:9 in a desktop grid and a phone feed.
   - **Let strangers pick** uploads them (`POST /images`) and opens the form on `/` with them as options A–D and a question for the tool. The footer links all three.
@@ -542,6 +544,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - `415` for a non-JSON body.
     - `400 {error, option}` when that option's uploaded photo is gone (new with photo upload).
     - `visibility` defaults to `unlisted`. The account cookie is set if missing.
+    - **New (growth, 2026-11-04):** `publishResult?: boolean` (default `false`) publishes the result at `/results/<slug>` once the poll closes. `400` if it isn't a boolean, comes with `visibility: "private"`, or comes without a question.
     - An option's `imageUrl` is an https link, or a URL from `POST /images` (on this site, so plain http in local dev).
   - **New with photo upload (growth, 2026-10-19):**
     - `POST /images`, body: the photo's bytes with an `image/*` type → `201 {id, url}`, or `400` (empty), `413` (over 5 MB), `415` (not image/*, or the bytes aren't a JPEG, PNG or WebP), `422` (over 64 megapixels) and `503` (photo storage full). The account cookie is set if missing.
@@ -564,7 +567,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
       - `503` if Stripe isn't configured.
       - The account cookie is set if missing.
     - `POST /stripe/webhook` (Stripe only) → `200 {received: true}`, `400` for a bad signature or body, `503` without `STRIPE_WEBHOOK_SECRET`.
-  - `poll` = `{id, question, options[{text, imageUrl}], target, visibility, status: open|closed|no_result, winner, voteCount, tally, myVote, mine, createdAt, closesAt, closedAt}`.
+  - `poll` = `{id, question, options[{text, imageUrl}], target, visibility, publishResult, status: open|closed|no_result, winner, voteCount, tally, myVote, mine, createdAt, closesAt, closedAt}` (`publishResult` new on 2026-11-04).
     - `winner` and `tally` are `null` while open.
     - On a private poll they're also `null` for everyone but the creator (`mine: false`), even once closed.
 - **Credit rule.** `credits = floor(votes on other people's polls / 5) − public polls posted`.
@@ -694,7 +697,7 @@ SELECT account_id, count(*) FROM payments GROUP BY account_id HAVING count(*) > 
 ```
 - **A refund** is done in the Stripe dashboard. To also take Pro away, run `DELETE FROM payments WHERE session_id = 'cs_…'`. Private polls already created stay private.
 - **Not built from the PRD's paid tier: higher vote targets.** ROADMAP's M3 doesn't list them. The follow-up is a per-plan `MAX_TARGET` in `lib/limits.ts`, checked with the plan after validation, the same way `private` is.
-- **New DDL still goes last in `SCHEMA` (`lib/db.ts`),** with `SCHEMA_SENTINEL` pointed at the table or index it creates. It's now `images_unused_idx` (photo upload).
+- **New DDL still goes last in `SCHEMA` (`lib/db.ts`),** with `SCHEMA_SENTINEL` pointed at the table or index it creates. It's now `polls_published_idx` (public result pages, growth 2026-11-04).
 
 - **Moderation, by hand for now.** The owner can list hidden polls in the Neon SQL editor:
   ```sql

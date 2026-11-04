@@ -352,6 +352,43 @@ button.link {
   flex: 1;
 }
 
+/* Public result pages (GROWTH.md, 2026-11-04): the result in a sentence, then each option's photo, whole
+   (a book cover keeps its title), beside its bar */
+.result-page .result h2 {
+  font-size: 1.15rem;
+}
+
+.result-page .bars li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.option-split {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The count goes under the option's name, so a long name keeps the row's width on a phone */
+.option-split .bar-label {
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.3rem;
+}
+
+.option-thumb {
+  flex-shrink: 0;
+  width: 5.5rem;
+  height: 7rem;
+  object-fit: contain;
+  background: var(--bg);
+  border-radius: 0.5rem;
+}
+
+.win .option-thumb {
+  outline: 3px solid var(--win);
+}
+
 /* Under a poll you voted on: make your own */
 .make-own p {
   margin: 0 0 0.75rem;

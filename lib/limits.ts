@@ -16,6 +16,6 @@ export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 export const MAX_IMAGE_BYTES = 5_000_000
 /** "Vote 5, post 1": votes on other people's polls that earn one public poll. */
 export const VOTES_PER_CREDIT = 5
-/** Reports from distinct accounts that take a poll out of the public feed. */
+/** Reports from distinct accounts that take a poll out of the public feed, and its result page down. */
 export const REPORTS_TO_HIDE = 3
 export const FEED_PAGE_SIZE = 20

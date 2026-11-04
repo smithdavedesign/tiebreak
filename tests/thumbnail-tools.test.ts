@@ -38,9 +38,9 @@ const count = (html: string, re: RegExp) => html.match(re)?.length ?? 0
 const three = ['A', 'B', 'C'].map((letter, i) => ({ letter, src: `blob:http://localhost/${i}`, name: `mug-${i}.jpg` }))
 
 describe('the tool pages', () => {
-  it('are the TOOLS list, and all in PUBLIC_PAGES and the sitemap', () => {
+  it('are the TOOLS list, and all in PUBLIC_PAGES and the sitemap', async () => {
     expect(TOOLS.map((t) => t.path).sort()).toEqual([...paths].sort())
-    const urls = sitemap().map((e) => e.url)
+    const urls = (await sitemap()).map((e) => e.url)
     for (const path of paths) {
       expect(PUBLIC_PAGES).toContain(path)
       expect(urls).toContain(`${SITE_URL}${path}`)

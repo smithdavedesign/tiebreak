@@ -27,9 +27,9 @@ const paths = Object.keys(pages) as (keyof typeof pages)[]
 useTestDb()
 
 describe('the search pages', () => {
-  it('are the GUIDES list, and all in PUBLIC_PAGES and the sitemap', () => {
+  it('are the GUIDES list, and all in PUBLIC_PAGES and the sitemap', async () => {
     expect(GUIDES.map((g) => g.path).sort()).toEqual([...paths].sort())
-    const urls = sitemap().map((e) => e.url)
+    const urls = (await sitemap()).map((e) => e.url)
     for (const path of paths) {
       expect(PUBLIC_PAGES).toContain(path)
       expect(urls).toContain(`${SITE_URL}${path}`)

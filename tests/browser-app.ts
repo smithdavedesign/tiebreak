@@ -83,6 +83,7 @@ export default async function setup(project: TestProject) {
       fetch(`${base}/tools/book-cover-thumbnail-test`),
       fetch(`${base}/tools/youtube-thumbnail-preview`),
       fetch(`${base}/sitemap.xml`),
+      fetch(`${base}/results/AAAAAAAAAAAA`),
     ])
   } catch (error) {
     stop()

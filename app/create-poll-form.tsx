@@ -88,6 +88,9 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
   const [isPublic, setIsPublic] = useState(false)
   // Private (Pro) and public are exclusive: a private poll never goes to the feed.
   const [isPrivate, setIsPrivate] = useState(false)
+  // So are private and a published result (the API answers 400 to both).
+  const [publishResult, setPublishResult] = useState(false)
+  const publishing = publishResult && !isPrivate
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<false | 'uploading' | 'creating'>(false)
   const canPostPublic = account.credits > 0
@@ -138,6 +141,7 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
           target: Number(target),
           durationHours,
           visibility: isPrivate ? 'private' : isPublic ? 'public' : 'unlisted',
+          publishResult: publishing,
         }),
       })
       const body = await res.json().catch(() => null)
@@ -159,9 +163,10 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
   return (
     <form className="card create" onSubmit={submit}>
       <label>
-        Question <span className="hint">(optional)</span>
+        Question <span className="hint">{publishing ? '(the result page’s title)' : '(optional)'}</span>
         <input
           value={question}
+          required={publishing}
           maxLength={MAX_QUESTION_LENGTH}
           placeholder="Which listing photo should I use?"
           onChange={(e) => setQuestion(e.target.value)}
@@ -281,6 +286,19 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
           one.
         </p>
       )}
+
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={publishing}
+          disabled={isPrivate}
+          onChange={(e) => setPublishResult(e.target.checked)}
+        />
+        <span>
+          Publish the result when it closes
+          <span className="hint"> (on a public page that search engines can list)</span>
+        </span>
+      </label>
 
       {plan === 'pro' ? (
         <label className="check">

@@ -1,11 +1,11 @@
 // npm run screenshots: starts the app, drives the main job with Playwright at
 // desktop and phone size, saves PNGs to docs/screenshots/ and stops the app. Not
-// part of `npm test`. The flow: a seller posts a poll with a photo for each option;
-// its link unfurls as the poll's share card; a stranger opens the link, votes and is
-// offered "Make your own tiebreak", which opens the start page; two more votes close
-// the poll, and its card shows the winner and the split. The cards are images
-// (1200×630), so they're taken once, at desktop size. The sample photos are drawn in
-// the browser (two mugs), so no real photo is used.
+// part of `npm test`. The flow (public result pages, GROWTH.md 2026-11-04): an
+// author posts a poll with three book-cover photos and ticks "Publish the result
+// when it closes"; five strangers vote on the link and it closes; its poll page
+// links to the public result page; that page is titled with the question and shows
+// the winner and the split; and /sitemap.xml lists it. The covers are drawn in the
+// browser (made-up titles), so no real photo, book or person is used.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -22,12 +22,11 @@ const outDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url))
 const port = Number(process.env.SCREENSHOT_PORT ?? 3187)
 const base = `http://localhost:${port}`
 
-const QUESTION = 'Which photo for my ceramic mug listing?'
-const OPTION_A = 'Speckled blue glaze, morning light'
-const OPTION_B = 'Matte white on a walnut shelf'
-const TARGET = 3
+const QUESTION = 'Which cover for my cozy mystery novel?'
+const OPTIONS = ['Lighthouse at dusk', 'Bakery window at night', 'Teacup and toast, bright']
+const VOTES = [1, 1, 0, 1, 2] // five strangers: B wins 3 of 5
 const SIZES = ['desktop', 'mobile']
-const SHOTS = ['card-open.png', 'card-result.png', ...['voted', 'home'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))]
+const SHOTS = [...['form-publish', 'result-page'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`)), 'poll-closed-desktop.png', 'sitemap-desktop.png']
 
 if (!process.env.CHROMIUM_PATH) {
   console.error('Set CHROMIUM_PATH to a Chromium or Chrome binary (no browser is downloaded).')
@@ -37,7 +36,8 @@ if (!process.env.CHROMIUM_PATH) {
 // Sample data only: no real database, no real Stripe, no visit beacon (not production).
 const appEnv = Object.fromEntries(
   Object.entries(process.env).filter(
-    ([name]) => name !== 'DATABASE_URL' && !name.startsWith('STRIPE_') && !name.endsWith('VERCEL_ENV'),
+    ([name]) =>
+      name !== 'DATABASE_URL' && !name.startsWith('STRIPE_') && !name.endsWith('VERCEL_ENV') && name !== 'NEXT_PUBLIC_DEPLOY_ENV',
   ),
 )
 const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port)], {
@@ -81,175 +81,220 @@ async function strangerVotes(id, option) {
 }
 
 /**
- * Two sample product photos, drawn on a canvas in the page and encoded as JPEG the
- * way a phone's photo would arrive: a speckled blue mug in morning light, and a
- * matte white mug on a walnut shelf.
+ * Three sample book covers, drawn on a canvas in the page and encoded as JPEG the way
+ * a phone's photo would arrive: a lighthouse at dusk, a lit bakery window at night,
+ * and a teacup with toast. The titles are made up.
  */
-async function samplePhotos(page) {
+async function sampleCovers(page) {
   const encoded = await page.evaluate(async () => {
-    const draw = (scene) => {
-      const size = 900
-      const canvas = document.createElement('canvas')
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')
-      const wall = ctx.createLinearGradient(0, 0, size, size)
-      wall.addColorStop(0, scene.wall[0])
-      wall.addColorStop(1, scene.wall[1])
-      ctx.fillStyle = wall
-      ctx.fillRect(0, 0, size, size)
-      // The surface the mug stands on.
-      ctx.fillStyle = scene.surface
-      ctx.fillRect(0, 640, size, 260)
-      if (scene.grain) {
-        ctx.strokeStyle = 'rgba(30, 15, 5, 0.35)'
-        ctx.lineWidth = 3
-        for (let y = 660; y < size; y += 26) {
-          ctx.beginPath()
-          ctx.moveTo(0, y)
-          ctx.bezierCurveTo(300, y - 12, 600, y + 14, size, y - 4)
-          ctx.stroke()
-        }
-      }
-      // Shadow, handle, body and rim.
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)'
-      ctx.beginPath()
-      ctx.ellipse(470, 668, 250, 34, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.lineWidth = 46
-      ctx.strokeStyle = scene.mug[1]
-      ctx.beginPath()
-      ctx.ellipse(630, 450, 95, 120, 0, -Math.PI / 2, Math.PI / 2)
-      ctx.stroke()
-      const body = ctx.createLinearGradient(250, 0, 640, 0)
-      body.addColorStop(0, scene.mug[1])
-      body.addColorStop(0.45, scene.mug[0])
-      body.addColorStop(1, scene.mug[1])
-      ctx.fillStyle = body
-      ctx.beginPath()
-      ctx.moveTo(250, 290)
-      ctx.lineTo(250, 610)
-      ctx.quadraticCurveTo(250, 665, 310, 665)
-      ctx.lineTo(580, 665)
-      ctx.quadraticCurveTo(640, 665, 640, 610)
-      ctx.lineTo(640, 290)
-      ctx.closePath()
-      ctx.fill()
-      ctx.fillStyle = scene.rim
-      ctx.beginPath()
-      ctx.ellipse(445, 290, 195, 38, 0, 0, Math.PI * 2)
-      ctx.fill()
-      if (scene.speckles) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
-        for (let i = 0; i < 260; i++) {
-          const x = 262 + ((i * 97) % 366)
-          const y = 330 + ((i * 53) % 320)
-          ctx.beginPath()
-          ctx.arc(x, y, 2 + (i % 4), 0, Math.PI * 2)
-          ctx.fill()
-        }
-      }
-      return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88))
+    const W = 600
+    const H = 900
+    const title = (ctx, lines, colour, y) => {
+      ctx.fillStyle = colour
+      ctx.textAlign = 'center'
+      ctx.font = 'bold 64px Georgia, serif'
+      lines.forEach((line, i) => ctx.fillText(line, W / 2, y + i * 74))
+      ctx.font = 'italic 30px Georgia, serif'
+      ctx.fillText('A cozy mystery', W / 2, y + lines.length * 74 + 10)
     }
+    const covers = [
+      (ctx) => {
+        const sky = ctx.createLinearGradient(0, 0, 0, H)
+        sky.addColorStop(0, '#1d2b53')
+        sky.addColorStop(0.65, '#e9875a')
+        sky.addColorStop(1, '#f6c58b')
+        ctx.fillStyle = sky
+        ctx.fillRect(0, 0, W, H)
+        ctx.fillStyle = '#2b3a55'
+        ctx.fillRect(0, 760, W, 140) // the sea
+        ctx.fillStyle = '#f4f1ea'
+        ctx.beginPath()
+        ctx.moveTo(270, 760)
+        ctx.lineTo(290, 470)
+        ctx.lineTo(350, 470)
+        ctx.lineTo(370, 760)
+        ctx.fill()
+        ctx.fillStyle = '#c0392b'
+        ctx.fillRect(280, 430, 80, 40)
+        ctx.fillStyle = 'rgba(255, 236, 160, 0.9)'
+        ctx.beginPath()
+        ctx.moveTo(320, 450)
+        ctx.lineTo(600, 380)
+        ctx.lineTo(600, 520)
+        ctx.fill()
+        title(ctx, ['THE', 'LIGHTHOUSE', 'RECIPE'], '#fdf6e3', 110)
+      },
+      (ctx) => {
+        ctx.fillStyle = '#1b1b2f'
+        ctx.fillRect(0, 0, W, H)
+        ctx.fillStyle = '#3a2f2f'
+        ctx.fillRect(90, 430, 420, 400) // the shop front
+        const glow = ctx.createRadialGradient(300, 600, 20, 300, 600, 220)
+        glow.addColorStop(0, '#ffe08a')
+        glow.addColorStop(1, '#d98b2b')
+        ctx.fillStyle = glow
+        ctx.fillRect(140, 470, 320, 250)
+        ctx.strokeStyle = '#3a2f2f'
+        ctx.lineWidth = 12
+        ctx.beginPath()
+        ctx.moveTo(300, 470)
+        ctx.lineTo(300, 720)
+        ctx.moveTo(140, 595)
+        ctx.lineTo(460, 595)
+        ctx.stroke()
+        ctx.fillStyle = '#5a1e1e'
+        ctx.beginPath()
+        ctx.ellipse(230, 680, 60, 26, 0, 0, Math.PI * 2) // a loaf in the window
+        ctx.fill()
+        title(ctx, ['MURDER AT', 'THE', 'BAKEHOUSE'], '#ffe08a', 110)
+      },
+      (ctx) => {
+        ctx.fillStyle = '#fbe7a1'
+        ctx.fillRect(0, 0, W, H)
+        ctx.fillStyle = '#f2b5c4'
+        for (let x = 0; x < W; x += 60) ctx.fillRect(x, 0, 30, H) // striped tablecloth
+        ctx.fillStyle = '#fbe7a1'
+        ctx.fillRect(40, 60, 520, 330)
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath()
+        ctx.ellipse(300, 690, 210, 50, 0, 0, Math.PI * 2) // saucer
+        ctx.fill()
+        ctx.fillStyle = '#5bb3a9'
+        ctx.beginPath()
+        ctx.moveTo(190, 520)
+        ctx.lineTo(410, 520)
+        ctx.quadraticCurveTo(400, 680, 300, 680)
+        ctx.quadraticCurveTo(200, 680, 190, 520)
+        ctx.fill()
+        ctx.strokeStyle = '#5bb3a9'
+        ctx.lineWidth = 18
+        ctx.beginPath()
+        ctx.ellipse(420, 580, 40, 50, 0, -Math.PI / 2, Math.PI / 2)
+        ctx.stroke()
+        ctx.fillStyle = '#d9a35b'
+        ctx.fillRect(400, 760, 140, 100) // toast
+        title(ctx, ['TEA, TOAST', 'AND', 'TROUBLE'], '#7a2e3a', 130)
+      },
+    ]
     const toBase64 = async (blob) => {
       let binary = ''
       for (const byte of new Uint8Array(await blob.arrayBuffer())) binary += String.fromCharCode(byte)
       return btoa(binary)
     }
-    const blue = await draw({
-      wall: ['#fff3dc', '#f4d9b0'],
-      surface: '#efe6da',
-      mug: ['#4f86d9', '#1f4f9e'],
-      rim: '#183f80',
-      speckles: true,
-    })
-    const white = await draw({
-      wall: ['#e7e3dc', '#cfc8bd'],
-      surface: '#6b4325',
-      grain: true,
-      mug: ['#fbfaf7', '#d9d5cd'],
-      rim: '#c9c4ba',
-    })
-    return { a: await toBase64(blue), b: await toBase64(white) }
+    const out = []
+    for (const draw of covers) {
+      const canvas = document.createElement('canvas')
+      canvas.width = W
+      canvas.height = H
+      draw(canvas.getContext('2d'))
+      out.push(await toBase64(await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88))))
+    }
+    return out
   })
-  return { a: Buffer.from(encoded.a, 'base64'), b: Buffer.from(encoded.b, 'base64') }
+  return encoded.map((b64) => Buffer.from(b64, 'base64'))
 }
 
 const allLoaded = (images) => images.evaluateAll((els) => els.every((el) => el.complete && el.naturalWidth > 0))
-
-// Viewport only, from the top of the page (or from an element), without the Next dev-mode badge.
-async function shot(page, file, { from } = {}) {
-  await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
-  await page.evaluate(() => document.activeElement?.blur())
-  if (from) await from.evaluate((el) => el.scrollIntoView({ block: 'start' }))
-  else await page.evaluate(() => window.scrollTo(0, 0))
-  await page.screenshot({ path: `${outDir}${file}` })
-}
 
 async function waitForImages(page, selector) {
   const images = page.locator(selector)
   for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
 }
 
-/** A poll's share card, opened as an image (what a chat app or social site shows for the link). */
-async function shotOfCard(page, path, file) {
-  const res = await page.goto(`${base}${path}`)
-  if (res?.status() !== 200 || res.headers()['content-type'] !== 'image/png') {
-    throw new Error(`The card at ${path} answered ${res?.status()} ${res?.headers()['content-type']}`)
-  }
+// Viewport only, from the top of the page (or with an element in the middle), without the Next dev-mode badge.
+async function shot(page, file, { center } = {}) {
+  await page.addStyleTag({ content: 'nextjs-portal { display: none !important }' })
+  await page.evaluate(() => document.activeElement?.blur())
+  if (center) await center.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  else await page.evaluate(() => window.scrollTo(0, 0))
   await page.screenshot({ path: `${outDir}${file}` })
 }
 
-async function run(browser, label, contextOptions) {
-  const desktop = label === 'desktop'
-
-  // 1. A seller posts a poll with a photo for each option (the main job).
-  const seller = await browser.newContext(contextOptions)
-  const page = await seller.newPage()
+/** The new-poll form filled in with the three covers and the publish box ticked. Returns the page. */
+async function fillForm(context, covers) {
+  const page = await context.newPage()
   await page.goto(base)
   await page.getByLabel('Option A text').waitFor()
+  await page.getByRole('button', { name: '+ Add option' }).click()
   await page.getByLabel('Question').fill(QUESTION)
-  await page.getByLabel('Option A text').fill(OPTION_A)
-  await page.getByLabel('Option B text').fill(OPTION_B)
-  await page.getByLabel('Close at').fill(String(TARGET))
-  const photos = await samplePhotos(page)
-  await page.getByLabel('Option A photo').setInputFiles({ name: 'speckled-blue-mug.jpg', mimeType: 'image/jpeg', buffer: photos.a })
-  await page.getByLabel('Option B photo').setInputFiles({ name: 'white-mug-walnut.jpg', mimeType: 'image/jpeg', buffer: photos.b })
-  await page.locator('img.thumb').nth(1).waitFor()
-  await page.getByRole('button', { name: 'Create poll' }).click()
-  await page.waitForURL(/\/p\/[^/?]+/)
-  await page.getByText('Your poll is live').waitFor()
-  const id = new URL(page.url()).pathname.split('/').pop()
+  for (const [i, letter] of ['A', 'B', 'C'].entries()) {
+    await page.getByLabel(`Option ${letter} text`).fill(OPTIONS[i])
+    await page.getByLabel(`Option ${letter} photo`).setInputFiles({ name: `cover-${letter.toLowerCase()}.jpg`, mimeType: 'image/jpeg', buffer: covers[i] })
+  }
+  await page.locator('img.thumb').nth(2).waitFor()
+  await page.getByLabel('Close at').fill(String(VOTES.length))
+  await page.getByLabel(/Publish the result when it closes/).check()
+  return page
+}
 
-  // 2. What its link unfurls as: the poll's own card, the question and both photos.
-  if (desktop) await shotOfCard(page, `/p/${id}/card?v=open`, 'card-open.png')
+/** A request and its response, shown on a plain page (for what has no page of its own: the sitemap). */
+async function shotOfRequest(context, path, slug, file) {
+  const res = await fetch(`${base}${path}`)
+  const xml = await res.text()
+  if (res.status !== 200 || !xml.includes(`/results/${slug}</loc>`)) throw new Error(`${path} answered ${res.status} without the result page`)
+  const entries = xml.match(/<url>.*?<\/url>/gs) ?? []
+  const shown = entries.filter((e) => e.includes('/results/'))
+  const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const page = await context.newPage()
+  await page.setContent(`<!doctype html><meta charset="utf-8"><title>GET ${path}</title>
+    <body style="font: 16px/1.5 system-ui, sans-serif; margin: 32px; color: #1d1d1f">
+    <p style="margin:0 0 4px"><b>Request</b></p>
+    <pre style="background:#f5f5f7;padding:12px 16px;border-radius:8px;margin:0 0 20px">GET ${escape(path)}</pre>
+    <p style="margin:0 0 4px"><b>Response</b>: ${res.status}, ${escape(res.headers.get('content-type') ?? '')}, ${entries.length} &lt;url&gt; entries</p>
+    <p style="margin:0 0 8px;color:#6e6e73">The first ${entries.length - shown.length} are tiebreak's public pages (/, /feed, the guides and tools). Then the published results:</p>
+    <pre style="background:#f5f5f7;padding:12px 16px;border-radius:8px;white-space:pre-wrap">${escape(shown.join('\n'))}</pre>
+    </body>`)
+  await page.screenshot({ path: `${outDir}${file}` })
+  await page.close()
+}
 
-  // 3. A stranger opens the shared link (no cookie: a new anonymous account), picks
-  // one, and is offered a poll of their own.
-  const stranger = await browser.newContext(contextOptions)
-  const voter = await stranger.newPage()
-  await voter.goto(`${base}/p/${id}`)
-  await waitForImages(voter, '.swipe-card img')
-  await voter.getByRole('button', { name: 'Pick A' }).click()
-  const makeYourOwn = voter.getByRole('link', { name: 'Make your own tiebreak' })
-  await makeYourOwn.waitFor()
-  await shot(voter, `voted-${label}.png`)
+async function run(browser) {
+  // 1. Desktop: an author fills in the new-poll form with three covers and ticks the box (the core action).
+  const author = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const probe = await author.newPage()
+  await probe.goto(base)
+  const covers = await sampleCovers(probe)
+  await probe.close()
+  const form = await fillForm(author, covers)
+  await shot(form, 'form-publish-desktop.png', { center: form.getByLabel(/Publish the result when it closes/) })
+  await form.getByRole('button', { name: 'Create poll' }).click()
+  await form.waitForURL(/\/p\/[^/?]+/)
+  await form.getByText('When it closes, its result gets a public page').waitFor()
+  const id = new URL(form.url()).pathname.split('/').pop()
 
-  // 4. The link opens the start page, tagged ?ref=poll for the visit counter.
-  await makeYourOwn.click()
-  await voter.waitForURL(`${base}/?ref=poll`)
-  await voter.getByLabel('Question').waitFor()
-  await shot(voter, `home-${label}.png`)
+  // 2. Five strangers vote on the shared link; the poll closes at 5, and its page links to the published result.
+  for (const option of VOTES) await strangerVotes(id, option)
+  await form.goto(`${base}/p/${id}`)
+  const published = form.getByRole('link', { name: QUESTION })
+  await published.waitFor()
+  await waitForImages(form, '.result img')
+  await shot(form, 'poll-closed-desktop.png')
+  const path = await published.getAttribute('href')
+  const slug = path.replace('/results/', '')
 
-  // 5. Two more strangers vote; the poll closes at 3, and its card shows the winner and the split.
-  if (desktop) {
-    await strangerVotes(id, 0)
-    await strangerVotes(id, 1)
-    await shotOfCard(page, `/p/${id}/card?v=closed`, 'card-result.png')
+  // 3. The public result page, titled with the question: the winner, then every option's split.
+  for (const [size, options] of [
+    ['desktop', { viewport: { width: 1280, height: 800 } }],
+    ['mobile', { ...devices['iPhone 13'] }],
+  ]) {
+    const visitor = await browser.newContext(options)
+    const page = await visitor.newPage()
+    const res = await page.goto(`${base}${path}`)
+    if (res?.status() !== 200 || (await page.title()) !== QUESTION) throw new Error(`${path} answered ${res?.status()}`)
+    await waitForImages(page, '.result-page img')
+    await shot(page, `result-page-${size}.png`)
+    await visitor.close()
   }
 
-  await stranger.close()
-  await seller.close()
+  // 4. The sitemap lists it.
+  await shotOfRequest(author, '/sitemap.xml', slug, 'sitemap-desktop.png')
+  await author.close()
+
+  // 5. Phone: the same form, with the box ticked.
+  const phone = await browser.newContext({ ...devices['iPhone 13'] })
+  const phoneForm = await fillForm(phone, covers)
+  await shot(phoneForm, 'form-publish-mobile.png', { center: phoneForm.getByLabel(/Publish the result when it closes/) })
+  await phone.close()
 }
 
 /** This script owns docs/screenshots/: PNGs from older runs that it no longer takes go. */
@@ -266,8 +311,7 @@ try {
   await waitForApp()
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
   try {
-    await run(browser, 'desktop', { viewport: { width: 1280, height: 800 } })
-    await run(browser, 'mobile', { ...devices['iPhone 13'] })
+    await run(browser)
   } finally {
     await browser.close()
   }

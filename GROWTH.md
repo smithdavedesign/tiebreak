@@ -224,3 +224,104 @@ SELECT
                      AND q.creator_id IS DISTINCT FROM p.creator_id AND q.creator_id IS DISTINCT FROM 'house')) AS polls_by_earlier_voters;
 ```
 `polls_by_earlier_voters` counts new polls whose creator had first voted on someone else's poll: the loop working. At these numbers, read the counts, not rates.
+
+## 2026-11-04: public result pages for closed polls
+
+**Mission:** opt-in public result pages for closed polls, indexed in the sitemap. PickFu publishes closed cover polls as indexable result pages, and they rank for searches like "which book cover", so buyers do search the questions themselves. tiebreak can do the same with real polls only: a creator ticks "Publish the result when it closes", and the closed poll becomes a page titled with its question.
+
+**Hypothesis:** programmatic pages made from people's own polls bring visitors from search. Each published poll is a page for the question its creator asked, which is close to what the next author or seller types into a search box.
+
+**Decisions** (nobody to ask, so decided here)
+- **The address is `/results/<the question's words>-<poll id>`,** e.g. `/results/which-cover-for-my-cozy-mystery-novel-AbC_dEf-1234`. The words are for people and search: lower-case ASCII, accents dropped, at most 60 characters, cut at a word. The 12-character id at the end finds the poll. A question with no Latin letters or digits gets the id alone. No slug column: questions can't be edited, so the address is worked out from the poll. Any other words before the id (or the bare id) get a 308 to the poll's own address, so each result has one URL.
+- **What counts as published** (`hasResultPage` in `lib/results.ts`, and `getPublishedResult`/`listPublishedResults` in `lib/polls.ts`):
+  - the creator opted in;
+  - the poll isn't private;
+  - it has a question;
+  - it closed with at least one vote (status `closed`, ties included);
+  - fewer than `REPORTS_TO_HIDE` (3) accounts reported it.
+  Everything else is a 404, with no hint whether the poll exists. A poll nobody voted on (`no_result`) has nothing to show, so it gets no page. House polls are never published (they aren't people's polls), and nor are polls created before today (the column defaults to false).
+- **Private and published are exclusive, checked in three places.** `POST /polls` answers 400 to both (in `parseNewPoll`, before the Pro check, so a free account gets the same 400 as a Pro one). The page and the sitemap also skip private polls, in case a row ever has both. The form disables the box while "Keep the result private" is ticked, as it already does for the public-feed box.
+- **Publishing needs a question** (400 without one; the form makes the field required once the box is ticked). The question is the page's `<title>` and `<h1>`, and a page titled "Which one?" would rank for nothing.
+- **An overdue poll is closed on read, as everywhere else,** so the page closes it on its first visit. The sitemap also lists an opted-in poll that's past its deadline with votes and hasn't been opened since. It would close with the same result on that first visit, so every listed URL answers 200.
+- **The page** is server-rendered on each request (`dynamic = 'force-dynamic'`): 3 reports take it down at once, and it appears as soon as the poll closes. It shows:
+  - the `<title>` (`title.absolute`, so not "… · tiebreak") and `<h1>`, both the question;
+  - a description with the result in one sentence ("Winner: Bakery window at night, with 3 of 5 votes (60%)." or "It's a tie between …, with 2 votes each out of 4.");
+  - a canonical URL, and the poll's own share card (`/p/:id/card?v=closed`, which shows the result) as `og:image` and `twitter:image`;
+  - each option whole (`object-fit: contain`, so a cover keeps its title) beside its votes, share and bar, with the winner framed;
+  - a line on who voted: anonymous votes from people the creator shared the link with, plus strangers in the feed for a public poll. No claim beyond that;
+  - "Make your own tiebreak", a plain `<a href="/?ref=result">`, so the full page load records the `ref=result` tag the way `ref=poll` works;
+  - the existing Report button.
+  The poll page's large square winner photo isn't used, since it crops a book cover's title.
+- **The sitemap reads the database on each request** (`force-dynamic`), so `next build`, which has no database, never queries. Published results follow the public pages, newest first. Each has `lastmod` set to when it closed, and at most 40,000 are listed (a sitemap file holds 50,000). If the database is down, the sitemap still lists the public pages and logs the error.
+- **The visit beacon** (acceptance criterion 4): the result page sends its own `visit` with `"path": "/results/<slug>"` (`PathVisit` in `app/visit-beacon.tsx`), once per session per result page. The layout's beacon skips `/results/` pages, so a landing counts once, as the tool pages already do. One consequence: a 404 under `/results/` sends no visit. The privacy page says a result page visit names its page.
+- **The creator is told.** A new poll's notice adds "When it closes, its result gets a public page, titled with your question." Once it closes, its `/p/:id` page links to the result. That poll page stays `noindex`.
+- **The privacy page** says what publishing shows: the question, options, photos and vote counts, never who voted. It also says private polls can't be published and 3 reports take a page down.
+- **The form label avoids the word "question".** Playwright's `getByLabel('Question')` matches substrings, and the browser tests and the screenshot script use it for the question field.
+- **The native app is unchanged** (acceptance criterion 5). It never sends `publishResult`, which defaults to false, so its create request works as before (tested). `PollView` gains `publishResult`, which the app ignores. No file under `mobile/` changed.
+- **No new dependency, service or key**, so no `.provision` line. Checkout, Stripe, prices and payment links are untouched, and so are the `activate` and `checkout` events.
+- **Scope check:** 13 app files (2 new), past the checklist's 8-file smell line, with no new service or class. Most are a line or two of wiring (the form, the notice, the beacon, the privacy copy, doc comments). The feature's weight is in `lib/results.ts`, the two queries and the page. Not built: a page listing all published results, structured data, publishing from the native app, and a creator control to unpublish (the owner can, below).
+
+**What changed**
+- New: `lib/results.ts` (address, `hasResultPage`, the one-sentence summary) and `app/results/[slug]/page.tsx`.
+- `lib/polls.ts`: `publishResult` in `NewPoll`, `PollView` and `parseNewPoll` (the three 400s), stored on insert; `getPublishedResult` and `listPublishedResults`.
+- `lib/db.ts`: `polls.publish_result boolean NOT NULL DEFAULT false` and the partial index `polls_published_idx`, added last; the schema sentinel moved to it. An existing database gets both on the first request after deploy.
+- `app/sitemap.ts`: async and dynamic, plus the results. `app/create-poll-form.tsx`: the checkbox. `app/p/[id]/poll-view.tsx`: the notice and the link. `app/visit-beacon.tsx`: `PathVisit`, and `countVisit` skips result pages. `app/privacy/page.tsx`, `app/globals.css`, and doc comments in `app/polls/route.ts`, `lib/limits.ts` and `lib/site.ts`.
+- Tests (30 new, 482 in all, all passing, the browser tests included; `tsc`, the unused-code typecheck, `next build` with no `DATABASE_URL`, and `npm run cf:build` are clean):
+  - `tests/public-results.test.ts` (25, PGlite), one block per acceptance criterion:
+    1. The checkbox, off by default. Private plus published gets 400 for a Pro and a free account, and no poll is created. The flag is stored. A non-boolean, or publishing without a question, gets 400.
+    2. The `<title>`, `<h1>`, description, canonical and share card. Every option's row and bar, a tie, photos, honest copy, "Make your own tiebreak" to `/?ref=result`, the overdue poll, the 308s, and the poll page's notice and link.
+    3. 404s for open, un-opted, 3-times-reported (2 reports still up), no-votes and unknown polls, and for a private poll even with the flag forced on. The sitemap lists exactly the published ones, and still answers when the database is down. robots.txt allows `/results/`.
+    4. The page mounts the beacon with its path. The path goes out once per session. The layout's beacon leaves result pages alone, and poll pages are unchanged.
+    5. The app's create body still works. No file under `mobile/` differs from where this branch left `main`. That check needs `main` in the clone, so CI's shallow checkout skips it.
+  - `tests/public-results-browser.test.ts` (5, dev server and Chromium):
+    - real 200, 404 and 308 status codes;
+    - the HTML's `<title>`, `<h1>`, `<meta name="description">`, canonical and `og:image`;
+    - `/sitemap.xml` listing only the published poll;
+    - on a phone, loading a result page sends exactly one `visit` with its path, and "Make your own tiebreak" leads to `/?ref=result` with a `ref: "result"` visit;
+    - on desktop, the form's box (off by default) ticked, the request carrying `publishResult: true`, the poll closing, its page linking to the result, and that page's title.
+  - Mutation-checked (each reverted), all caught: no private check, open polls publishable, the report threshold +1, the layout counting result pages, the sitemap ignoring reports, no `PathVisit`, and the box on by default.
+  - Changed existing tests, all mechanically. `sitemap()` is async now, so `tests/go-live.test.ts`, `tests/search-pages.test.ts` and `tests/thumbnail-tools.test.ts` await it (same assertions). `tests/share-card.test.ts`'s `PollView` fixture gained `publishResult: false` for the type. `tests/browser-app.ts` also warms up `/results/`.
+  - **Fixed: the browser tests' shared dev server.** At the start of this build, `npm test` with `CHROMIUM_PATH` set had 21 failures. All were in `tests/photo-upload-browser.test.ts` and `tests/thumbnail-tools-browser.test.ts`, with `ECONNREFUSED`. The two October PRs merged two set-ups: `tests/share-card-browser.test.ts` started its own `next dev`, which knocked out the shared one the other two files use (Next locks `.next` per project). It now uses the shared server (`inject('appBase')`); its three tests are unchanged. CI doesn't set `CHROMIUM_PATH`, so it never saw this.
+- `npm run screenshots` now shows this feature (6 PNGs, the old ones replaced):
+  - the form with three cover photos and the box ticked (desktop and phone);
+  - the closed poll's page linking to its result;
+  - the result page (desktop and phone);
+  - `GET /sitemap.xml` and its result entry, on a plain page.
+  The covers are drawn in the browser, with made-up titles.
+- Not run here: the mobile CI steps (this sandbox can't install `mobile/`'s dependencies). Nothing under `mobile/` changed, and the app imports nothing from the web code.
+
+**Pre-landing review** (gstack checklist, against `git diff` and the new files)
+- **Pass 1, CRITICAL: nothing open.**
+  - Every new statement is parameterised.
+  - The only new write is the INSERT column. The lazy close on read is the existing one, under the row lock with `WHERE status = 'open'`, so a page's metadata and body reading at once can't close a poll twice.
+  - No raw HTML. Questions and options reach the page as React text and Next metadata (both escape). The result link and the sitemap URLs are built from `[a-z0-9-]` plus the id's own characters. Option images still pass the existing https-or-own-photo check.
+  - Enum and value completeness: `private` is excluded in all three places (parse, `hasResultPage`, the sitemap's SQL). `REPORTS_TO_HIDE` is the one threshold for the feed, the page and the sitemap. Every `PollView` consumer was read (the feed, the share card, the poll page; the native app has its own type and ignores the field). `SignalKind` is unchanged.
+- **Auto-fixed:** an export nothing used (`RESULTS_PREFIX`).
+- **Fixed during the build:** the result page first showed the poll page's large winner photo, cropped square. That cut a cover's title and pushed the split below the fold on a phone (seen in the screenshots). Each option now shows whole, beside its bar, with the count under the name.
+- **Open, decided here:**
+  - [P1, carried, sharper now] (confidence 7/10) No rate limits. A script could post and vote on its own polls to get spam questions indexed on tiebreak's domain. They'd be text only: questions and options are never links. Three reports take a page down, and the owner can take one down at once, below. Glance at new published results while traffic is small.
+  - [P3] A poll hidden by reports still shows "The result is published" on its `/p/` page, and that link is a 404. The poll page doesn't load report counts.
+  - [P3] The sitemap lists at most 40,000 results. Past that, split it with `generateSitemaps`.
+
+**Moderation, by hand** (Neon SQL editor):
+```sql
+-- Published results, newest first
+SELECT id, question, closed_at, (SELECT count(*) FROM reports r WHERE r.poll_id = p.id) AS reports
+  FROM polls p WHERE publish_result AND status = 'closed' ORDER BY closed_at DESC;
+-- Take one down at once (its poll keeps working at /p/<id>)
+UPDATE polls SET publish_result = false WHERE id = '<id>';
+```
+
+**Needs checking on RepoHQ's side:** the signal endpoint keeps `path` (the tool pages already rely on it) and `ref` on `visit` events. Without them, result-page visits still count as visits but can't be told apart.
+
+**Metric:** unique visitors a week to result pages, from RepoHQ's Ideas page for tiebreak: `visit` events whose `path` starts with `/results/`. The baseline is 0 a week (the pages are new, and the whole site had 0 visitors this week and the week before). The target is 10 a week within 28 days of the merge: read the 7 days ending on day 28.
+- The `referrer` on those events shows how many come from search (google.com, bing.com, duckduckgo.com).
+- Visits tagged `ref: "result"` are result-page readers who went on to the new-poll form.
+- Supply is the first thing to check, since a page exists only once someone publishes. Count it in the Neon SQL editor:
+```sql
+SELECT count(*) FILTER (WHERE publish_result) AS opted_in,
+       count(*) FILTER (WHERE publish_result AND status = 'closed') AS published,
+       count(*) AS polls
+  FROM polls WHERE created_at >= '<merge date>' AND creator_id IS DISTINCT FROM 'house';
+```
+- Submit `/sitemap.xml` in Google Search Console if David has it, and check indexing with a `site:` search for `/results/`. New pages can take weeks to be indexed. A miss on day 28 with no published polls says nothing about search, only that nobody opted in. With published polls and no visits, check indexing before calling it.

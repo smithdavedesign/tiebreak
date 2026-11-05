@@ -55,6 +55,8 @@ export interface NewPoll {
   target: number
   durationHours: number
   visibility: Visibility
+  /** Publish the result once the poll closes: a public page, titled with the question (never for private polls). */
+  publishResult: boolean
   /** Options whose image is a photo uploaded to tiebreak rather than a link. */
   uploads: Upload[]
 }
@@ -65,6 +67,8 @@ export interface PollView {
   options: Option[]
   target: number
   visibility: Visibility
+  /** The creator opted in to a public result page (/results/<slug>) once the poll closes. */
+  publishResult: boolean
   status: Status
   /** Index of the winning option; null while open, on a tie, or with no votes. */
   winner: number | null
@@ -87,6 +91,7 @@ interface PollRow {
   target: number
   visibility: Visibility
   creator_id: string | null
+  publish_result: boolean
   status: Status
   winner: number | null
   created_at: Date | string
@@ -142,7 +147,7 @@ function parseOption(value: unknown, ownOrigin: string | undefined): { option: O
 export function parseNewPoll(input: unknown, ownOrigin?: string): Parsed<NewPoll> {
   if (!isRecord(input)) return { ok: false, error: 'Send a JSON object' }
 
-  const { question = '', options, target, durationHours, visibility = 'unlisted' } = input
+  const { question = '', options, target, durationHours, visibility = 'unlisted', publishResult = false } = input
   if (typeof question !== 'string' || question.trim().length > MAX_QUESTION_LENGTH) {
     return { ok: false, error: `question must be text of at most ${MAX_QUESTION_LENGTH} characters` }
   }
@@ -171,9 +176,16 @@ export function parseNewPoll(input: unknown, ownOrigin?: string): Parsed<NewPoll
   if (!isVisibility(visibility)) {
     return { ok: false, error: `visibility must be one of: ${VISIBILITIES.join(', ')}` }
   }
+  if (typeof publishResult !== 'boolean') return { ok: false, error: 'publishResult must be true or false' }
+  if (publishResult && visibility === 'private') {
+    return { ok: false, error: "A private poll's result is only for you, so it can't be published. Untick one of the two." }
+  }
+  if (publishResult && question.trim() === '') {
+    return { ok: false, error: 'Add a question to publish the result: its page is titled with the question.' }
+  }
   return {
     ok: true,
-    value: { question: question.trim(), options: parsedOptions, target, durationHours, visibility, uploads },
+    value: { question: question.trim(), options: parsedOptions, target, durationHours, visibility, publishResult, uploads },
   }
 }
 
@@ -233,6 +245,7 @@ function viewOf(
     options: row.options,
     target: row.target,
     visibility: row.visibility,
+    publishResult: row.publish_result,
     status: row.status,
     winner: hidden ? null : row.winner,
     voteCount: counts.voteCount,
@@ -295,8 +308,8 @@ export async function createPoll(poll: NewPoll, creatorId: string, now = new Dat
     const id = randomBytes(9).toString('base64url')
     const closesAt = new Date(now.getTime() + poll.durationHours * HOUR_MS)
     const { rows } = await sql.query<PollRow>(
-      `INSERT INTO polls (id, question, options, target, closes_at, created_at, visibility, creator_id)
-       VALUES ($1, $2, $3::jsonb, $4, $5::timestamptz, $6::timestamptz, $7, $8)
+      `INSERT INTO polls (id, question, options, target, closes_at, created_at, visibility, creator_id, publish_result)
+       VALUES ($1, $2, $3::jsonb, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9)
        RETURNING *`,
       [
         id,
@@ -307,6 +320,7 @@ export async function createPoll(poll: NewPoll, creatorId: string, now = new Dat
         now.toISOString(),
         poll.visibility,
         creatorId,
+        poll.publishResult,
       ],
     )
     if (hasUploads) await claimUploads(sql, id, poll.uploads)
@@ -434,6 +448,52 @@ export async function reportPoll(id: string, reporterId: string, now = new Date(
   const { found, inserted } = rows[0]
   if (!found) return 'not_found'
   return inserted ? 'ok' : 'duplicate'
+}
+
+/**
+ * A poll whose result has a public page (/results/<slug>): its creator opted in, it closed with at least one
+ * vote (a winner or a tie), and fewer than REPORTS_TO_HIDE accounts reported it. A poll past its deadline is
+ * closed first, as on its own page. Null for anything else, so the page is a 404.
+ */
+export async function getPublishedResult(id: string, now = new Date()): Promise<PollView | null> {
+  const poll = await getPoll(id, null, now)
+  // A private poll can't be published (parseNewPoll and a table check); the visibility test is a second lock.
+  if (!poll || !poll.publishResult || poll.status !== 'closed' || poll.visibility === 'private') return null
+  const db = await getDb()
+  const { rows } = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM reports WHERE poll_id = $1', [id])
+  return rows[0].n < REPORTS_TO_HIDE ? poll : null
+}
+
+/** The sitemap protocol allows 50,000 addresses a file; the public pages take a few of them. */
+const MAX_PUBLISHED_IN_SITEMAP = 49_000
+
+export interface PublishedResult {
+  id: string
+  question: string
+  /** When it closed (or its deadline, for a poll nobody has read since it ran out of time). */
+  closedAt: string
+}
+
+/**
+ * Every poll getPublishedResult() would show, newest first, for the sitemap. A poll past its deadline with
+ * votes counts as closed, though it's only marked closed when it's next read (a read or vote closes it).
+ */
+export async function listPublishedResults(now = new Date()): Promise<PublishedResult[]> {
+  const db = await getDb()
+  const { rows } = await db.query<{ id: string; question: string; closed_at: Date | string }>(
+    `SELECT p.id, p.question, COALESCE(p.closed_at, p.closes_at) AS closed_at
+       FROM polls p
+      WHERE p.publish_result
+        AND p.visibility <> 'private'
+        AND (p.status = 'closed'
+          OR (p.status = 'open' AND p.closes_at <= $1::timestamptz
+              AND EXISTS (SELECT 1 FROM votes v WHERE v.poll_id = p.id)))
+        AND (SELECT count(*) FROM reports r WHERE r.poll_id = p.id) < $2
+      ORDER BY 3 DESC, p.id
+      LIMIT $3`,
+    [now.toISOString(), REPORTS_TO_HIDE, MAX_PUBLISHED_IN_SITEMAP],
+  )
+  return rows.map((row) => ({ id: row.id, question: row.question, closedAt: iso(row.closed_at) }))
 }
 
 export type ExportResult =

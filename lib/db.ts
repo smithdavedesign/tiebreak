@@ -77,12 +77,19 @@ const SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS images_poll_idx ON images (poll_id)`,
   `CREATE INDEX IF NOT EXISTS images_unused_idx ON images (created_at) WHERE poll_id IS NULL`,
+  // Public result pages: the creator opted in to a page for the closed poll's
+  // result (/results/<slug>, listed in the sitemap). Earlier polls stay
+  // unpublished. A private poll's result is the creator's alone, so never both.
+  `ALTER TABLE polls ADD COLUMN IF NOT EXISTS publish_result boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE polls DROP CONSTRAINT IF EXISTS polls_publish_result_check,
+     ADD CONSTRAINT polls_publish_result_check CHECK (NOT (publish_result AND visibility = 'private'))`,
+  `CREATE INDEX IF NOT EXISTS polls_published_idx ON polls (closes_at) WHERE publish_result`,
 ]
 
 // Created by the last SCHEMA statement. The DDL runs in one transaction, so if
 // it exists the whole schema does. When you add DDL, put it last and point this
 // at the object it creates (a table or index: to_regclass can't see constraints).
-const SCHEMA_SENTINEL = 'images_unused_idx'
+const SCHEMA_SENTINEL = 'polls_published_idx'
 
 // Arbitrary constant: serialises DDL when several cold starts race.
 const SCHEMA_LOCK_KEY = 7_204_311

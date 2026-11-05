@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AccountView } from '@/lib/credits'
 import type { Plan } from '@/lib/plans'
 import type { PollView as Poll } from '@/lib/polls'
-import { CreditMeter, Face, LETTERS, Picker, ReportButton, labelOf } from '@/app/poll-parts'
+import { CreditMeter, Face, LETTERS, MakeYourOwn, Picker, ReportButton, labelOf } from '@/app/poll-parts'
+import { resultPath } from '@/lib/results'
 
 const TICK_MS = 30_000
 const MINUTE_MS = 60_000
@@ -83,6 +84,14 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
           ? `${poll.voteCount} of ${poll.target} votes · ${now === null ? '' : timeLeft(Date.parse(poll.closesAt) - now)}`
           : `Closed with ${poll.voteCount} ${poll.voteCount === 1 ? 'vote' : 'votes'}`}
       </p>
+      {open && poll.mine && poll.publishResult && (
+        <p className="hint">When it closes, the result gets its own public page, titled with your question.</p>
+      )}
+      {poll.status === 'closed' && poll.publishResult && (
+        <p className="hint">
+          The result is published: <a href={resultPath(poll)}>see its public page</a>.
+        </p>
+      )}
 
       {open && poll.myVote === null && (
         <Picker options={poll.options} onPick={vote} disabled={busy} />
@@ -104,7 +113,7 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
       )}
       {!open && (resultHidden ? <PrivateResult poll={poll} /> : <Result poll={poll} />)}
       {!open && poll.mine && <Export id={poll.id} plan={plan} />}
-      {!poll.mine && (poll.myVote !== null || !open) && <MakeYourOwn />}
+      {!poll.mine && (poll.myVote !== null || !open) && <MakeYourOwn from="poll" />}
 
       {notice && (
         <p className="notice" role="status">
@@ -188,24 +197,6 @@ function PrivateResult({ poll }: { poll: Poll }) {
       <h2>This poll has closed.</h2>
       <p>Its creator keeps the result private. Thanks for voting!</p>
       {poll.myVote !== null && <p className="hint">You voted {LETTERS[poll.myVote]}.</p>}
-    </div>
-  )
-}
-
-/**
- * The voter loop: once someone has voted here (or the poll closed before they could), invite
- * them to post their own. A plain <a>, not <Link>: the full page load runs the layout's visit
- * beacon on arrival, which records the ref=poll tag.
- */
-function MakeYourOwn() {
-  return (
-    <div className="card make-own">
-      <p>
-        <b>Stuck on a choice of your own?</b> Post 2–4 options and share the link. It&apos;s free.
-      </p>
-      <a className="button" href="/?ref=poll">
-        Make your own tiebreak
-      </a>
     </div>
   )
 }

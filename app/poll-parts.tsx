@@ -186,6 +186,24 @@ export function ReportButton({
   )
 }
 
+/**
+ * The voter loop: once someone has voted on a poll (or it closed before they could), or reads a published result,
+ * invite them to post their own. `from` tags the link (`/?ref=poll`, `/?ref=results`) for the visit counter. A plain
+ * <a>, not <Link>: the full page load runs the layout's visit beacon on arrival, which records the tag.
+ */
+export function MakeYourOwn({ from }: { from: 'poll' | 'results' }) {
+  return (
+    <div className="card make-own">
+      <p>
+        <b>Stuck on a choice of your own?</b> Post 2–4 options and share the link. It&apos;s free.
+      </p>
+      <a className="button" href={`/?ref=${from}`}>
+        Make your own tiebreak
+      </a>
+    </div>
+  )
+}
+
 /** "Vote 5, post 1": the caller's credits and progress toward the next one. */
 export function CreditMeter({ account, feedLink = false }: { account: AccountView; feedLink?: boolean }) {
   const done = VOTES_PER_CREDIT - account.votesToNextCredit

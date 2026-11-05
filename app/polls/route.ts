@@ -9,8 +9,8 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /polls { question?, options, target, durationHours, visibility? }
- * → 201 { id, shareUrl, poll } | 400
+ * POST /polls { question?, options, target, durationHours, visibility?, publishResult? }
+ * → 201 { id, shareUrl, poll } | 400 (also: publishResult with a private poll, or without a question)
  *   | 400 { error, option } (that option's uploaded photo can't be used: pick it again)
  *   | 403 (public poll without a posting credit, or private poll without Pro) | 415
  * An option's imageUrl is an https link, or a URL POST /images returned.

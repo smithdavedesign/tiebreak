@@ -2,42 +2,21 @@
 
 ## Screenshots
 
-![The share card of an open poll: its question and both uploaded mug photos](docs/screenshots/card-open.png)
+![The new-poll form on the start page with two book-cover photos and "Publish the result when it closes" ticked, desktop](docs/screenshots/form-desktop.png)
+![The same form on a phone, "Publish the result when it closes" ticked](docs/screenshots/form-mobile.png)
 
-What a poll's link now unfurls as in chats and on social sites (its `og:image` and `twitter:image`, drawn by `GET /p/:id/card` at 1200×630): the poll's own question and both of the seller's photos, not plain text.
+The start page's new-poll form (the core action): an author adds a photo of each cover, sets a 5-vote target and ticks the new "Publish the result when it closes" box, which is off by default.
 
-![The same poll's card once it closed: the winner marked, 67% to 33%](docs/screenshots/card-result.png)
+![The closed poll's public result page at /results/which-cover-for-my-cozy-mystery-paperback-…, desktop](docs/screenshots/result-desktop.png)
+![The same result page on a phone](docs/screenshots/result-mobile.png)
 
-Once the poll closes, the same link's card shows the result: the winner framed and labelled, and each option's share of the 3 votes.
+Its result once five strangers voted: the public page at `/results/<question words>-<id>`, titled with the question (`<title>` and `<h1>`), with each cover, the winner marked, the 3–2 split and "Make your own tiebreak". This is the page a searcher lands on.
 
-![A stranger who voted on the shared link, offered "Make your own tiebreak", desktop](docs/screenshots/voted-desktop.png)
-![A stranger who voted on the shared link, offered "Make your own tiebreak", phone](docs/screenshots/voted-mobile.png)
+![/sitemap.xml with the result page listed after the site's own pages](docs/screenshots/sitemap-desktop.png)
 
-A stranger opened the shared link and voted (the core action for a voter); the page now offers "Make your own tiebreak".
+`/sitemap.xml` lists the result page (with its close time as `lastmod`) after the site's own pages; open, un-opted and reported polls stay out.
 
-![The start page the link opens (/?ref=poll), desktop](docs/screenshots/home-desktop.png)
-![The start page the link opens (/?ref=poll), phone](docs/screenshots/home-mobile.png)
-
-Following it opens the start page at `/?ref=poll`, where they can post their own poll; the visit counter records the `ref=poll` tag.
-
-Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two mug photos are drawn in the browser). The cards are images, so they're taken once, at desktop size.
-
-![Etsy thumbnail preview with three mug photos in the search-grid mock at the 1:1 and 4:3 crops, desktop](docs/screenshots/tool-desktop.png)
-![Etsy thumbnail preview with three mug photos listed and the 1:1 search grid, phone](docs/screenshots/tool-mobile.png)
-
-The free Etsy thumbnail preview (`/tools/etsy-thumbnail-preview`): three listing photos added, each shown side by side in a search-grid mock at 1:1, 4:3 and 5:4 (5:4 is below the fold). The previews are drawn in the browser; nothing has been uploaded yet.
-
-![The new-poll form after Let strangers pick, the three photos as options A–C, desktop](docs/screenshots/form-desktop.png)
-![The new-poll form after Let strangers pick, the three photos as options A–C, phone](docs/screenshots/form-mobile.png)
-
-"Let strangers pick" uploaded the three photos and opened the new-poll form with them as options A–C and the tool's question filled in; the seller added a label to each and set a 3-vote target.
-
-![Closed three-photo poll with the winning photo and the vote split, desktop](docs/screenshots/result-desktop.png)
-![Closed three-photo poll with the winning photo and the vote split, phone](docs/screenshots/result-mobile.png)
-
-The poll it posted, closed: two strangers voted on the shared link, the creator tapped the third vote, and the result shows the winning photo and the split (2, 0, 1).
-
-These tool shots came from the thumbnail-tools PR (#13); `npm run screenshots` now regenerates the share-card flow above. `tests/thumbnail-tools-browser.test.ts` drives all three tools in Chromium.
+Regenerate them with `npm run screenshots` (set `CHROMIUM_PATH` to a Chromium binary; it starts the dev server on an in-memory database, with sample data only; the two covers are drawn in the browser and the book is made up). The sitemap is text, so it's taken once, at desktop size. `tests/result-pages-browser.test.ts` drives the same flow in Chromium; the earlier share-card and thumbnail-tool flows are covered by `tests/share-card-browser.test.ts` and `tests/thumbnail-tools-browser.test.ts`.
 
 People post two options, strangers swipe to pick one, and the poll closes at a vote target or deadline; sellers and creators pay a few dollars for a fast verdict instead of PickFu's $15+.
 

@@ -88,6 +88,8 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
   const [isPublic, setIsPublic] = useState(false)
   // Private (Pro) and public are exclusive: a private poll never goes to the feed.
   const [isPrivate, setIsPrivate] = useState(false)
+  // A public page for the result once it closes; never for a private poll (the API refuses both).
+  const [publishResult, setPublishResult] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<false | 'uploading' | 'creating'>(false)
   const canPostPublic = account.credits > 0
@@ -138,6 +140,7 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
           target: Number(target),
           durationHours,
           visibility: isPrivate ? 'private' : isPublic ? 'public' : 'unlisted',
+          publishResult: publishResult && !isPrivate,
         }),
       })
       const body = await res.json().catch(() => null)
@@ -281,6 +284,19 @@ export function CreatePollForm({ account, plan }: { account: AccountView; plan: 
           one.
         </p>
       )}
+
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={publishResult && !isPrivate}
+          disabled={isPrivate}
+          onChange={(e) => setPublishResult(e.target.checked)}
+        />
+        <span>
+          Publish the result when it closes
+          <span className="hint"> (it gets a public page of its own, which search engines can list)</span>
+        </span>
+      </label>
 
       {plan === 'pro' ? (
         <label className="check">

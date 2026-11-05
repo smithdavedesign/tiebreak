@@ -342,6 +342,37 @@ button.link {
   font-weight: 700;
 }
 
+/* A published result (/results/<slug>): each option's photo, whole, beside its split */
+.result-option {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.result-option > div {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Beside a photo there's little room: the count goes under a long label instead of squeezing it. */
+.result-option .bar-label {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.result-option img {
+  width: 5.5rem;
+  height: 5.5rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 0.6rem;
+  background: var(--bg);
+}
+
+.result-option.win img {
+  outline: 3px solid var(--win);
+}
+
 .share {
   display: flex;
   gap: 0.5rem;

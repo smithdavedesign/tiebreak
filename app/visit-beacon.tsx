@@ -2,14 +2,16 @@
 
 import { useEffect } from 'react'
 import { sendSignal } from '@/lib/beacon'
+import { isResultPath } from '@/lib/results'
 import { isToolPath } from '@/lib/tools'
 
 /**
- * A page load's visit. A tool page sends its own instead, with its path (app/tools/thumbnail-tool.tsx), so a
- * landing there counts once whichever of the two effects runs first.
+ * A page load's visit. A tool page and a published result page send their own instead, with their path
+ * (app/tools/thumbnail-tool.tsx, app/results/[slug]/result-visit.tsx), so a landing there counts once whichever
+ * of the two effects runs first.
  */
 export function countVisit(pathname: string) {
-  if (!isToolPath(pathname)) sendSignal('visit')
+  if (!isToolPath(pathname) && !isResultPath(pathname)) sendSignal('visit')
 }
 
 /** Counts one anonymous "visit" per browser session, on every page (mounted in the layout). */

@@ -8,6 +8,11 @@ import robots from '@/app/robots'
 import sitemap from '@/app/sitemap'
 import TermsPage from '@/app/terms/page'
 import { PUBLIC_PAGES, SIGNAL_URL, SITE_URL } from '@/lib/site'
+import { useTestDb } from './helpers'
+
+// The sitemap also lists published poll results (tests/result-pages.test.ts), so it reads a database: a fresh,
+// empty one, which has none.
+useTestDb()
 
 describe('robots.txt and sitemap.xml', () => {
   it('robots allows indexing, keeps the API out and points at the sitemap', () => {
@@ -16,8 +21,8 @@ describe('robots.txt and sitemap.xml', () => {
     expect(r.rules).toMatchObject({ userAgent: '*', allow: '/' })
     expect((r.rules as { disallow: string[] }).disallow).toContain('/polls')
   })
-  it('the sitemap lists every public page, and no poll pages', () => {
-    const urls = sitemap().map((e) => e.url)
+  it('the sitemap lists every public page, and no poll pages', async () => {
+    const urls = (await sitemap()).map((e) => e.url)
     expect(urls).toEqual(PUBLIC_PAGES.map((p) => `${SITE_URL}${p === '/' ? '' : p}`))
     expect(urls.some((u) => u.includes('/p/'))).toBe(false)
   })

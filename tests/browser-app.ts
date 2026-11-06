@@ -6,7 +6,9 @@
 // Vercel env never reach it, and neither does vitest's NODE_ENV. NEXT_PUBLIC_VERCEL_ENV is set to production
 // so the visit beacon's code runs as it does live; automated browsers (navigator.webdriver) still send nothing,
 // and the one test that clears that flag answers the signal endpoint itself, so nothing leaves the machine.
+// The app's STRIPE_WEBHOOK_SECRET is made up for each run, so a test can sign the webhook that makes an account Pro.
 import { spawn, type ChildProcess } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { once } from 'node:events'
 import { createServer, type AddressInfo } from 'node:net'
 import { fileURLToPath } from 'node:url'
@@ -17,6 +19,8 @@ declare module 'vitest' {
   export interface ProvidedContext {
     /** The shared dev server's URL, or '' when CHROMIUM_PATH is unset and the browser tests skip. */
     appBase: string
+    /** The shared dev server's webhook secret, made up for this run ('' when the browser tests skip). */
+    webhookSecret: string
   }
 }
 
@@ -45,6 +49,7 @@ async function waitForApp(base: string, app: ChildProcess) {
 
 export default async function setup(project: TestProject) {
   project.provide('appBase', '')
+  project.provide('webhookSecret', '')
   if (!process.env.CHROMIUM_PATH) return
 
   const port = await freePort()
@@ -60,6 +65,8 @@ export default async function setup(project: TestProject) {
     if (drop) delete env[name]
   }
   env.NEXT_PUBLIC_VERCEL_ENV = 'production'
+  const webhookSecret = ['whsec', 'browsertests', randomBytes(12).toString('hex')].join('_')
+  env.STRIPE_WEBHOOK_SECRET = webhookSecret
   const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port)], {
     cwd: root,
     detached: true,
@@ -83,11 +90,17 @@ export default async function setup(project: TestProject) {
       fetch(`${base}/tools/book-cover-thumbnail-test`),
       fetch(`${base}/tools/youtube-thumbnail-preview`),
       fetch(`${base}/sitemap.xml`),
+      fetch(`${base}/results/AAAAAAAAAAAA`),
+      fetch(`${base}/p/AAAAAAAAAAAA/card`),
+      fetch(`${base}/polls/AAAAAAAAAAAA/votes`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }),
+      fetch(`${base}/polls/AAAAAAAAAAAA/reports`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }),
+      fetch(`${base}/stripe/webhook`, { method: 'POST', body: '{}' }),
     ])
   } catch (error) {
     stop()
     throw error
   }
   project.provide('appBase', base)
+  project.provide('webhookSecret', webhookSecret)
   return stop
 }

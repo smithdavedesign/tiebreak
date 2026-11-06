@@ -357,6 +357,29 @@ button.link {
   margin: 0 0 0.75rem;
 }
 
+/* A published result (app/results): each option's photo, if it has one, next to its share of the votes */
+.split li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.split-row {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.split-thumb {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: var(--bg);
+}
+
 label.check {
   display: flex;
   gap: 0.6rem;

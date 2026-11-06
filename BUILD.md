@@ -498,7 +498,9 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
   - **New in M3:**
     - Pro accounts get a second checkbox, "Keep the result private: only you see the winner and the split (Pro)". Ticking it turns the public box off.
     - Free accounts see "Want the result kept private, or every vote in a spreadsheet? Get Pro" instead.
+  - **New (growth, 2026-11-06):** "Publish the result when it closes", off by default. Ticking "Keep the result private" (Pro) turns it off and disables it, and a published result needs a question (the page's title).
   - Creating a poll takes you to its share page.
+- **`/results/<question-words>-<id>`** (growth, 2026-11-06; see GROWTH.md): a published poll's result once it has closed with votes. Its `<title>` and `<h1>` are the question; the meta description states the winner and the vote count; every option shows its votes and share; "Make your own tiebreak" links to `/?ref=result`. It's a 404 while the poll is open, if it wasn't opted in, if it closed with no votes, and once 3 reports hide it; other words before the id get a 308 to the page's own address. `/sitemap.xml` lists every page that's up (it's now built per request). Its visit carries its `path`. A closed published poll's page links to it.
 - **`/tools/etsy-thumbnail-preview`, `/tools/book-cover-thumbnail-test`, `/tools/youtube-thumbnail-preview`** (growth, 2026-10-22; see GROWTH.md): free preview tools.
   - Add 2–4 JPEG, PNG or WebP images and see them side by side, drawn in the browser with nothing uploaded: Etsy search-grid tiles at 1:1, 4:3 and 5:4; book covers at about 160 and 80 px tall; YouTube tiles at 16:9 in a desktop grid and a phone feed.
   - **Let strangers pick** uploads them (`POST /images`) and opens the form on `/` with them as options A–D and a question for the tool. The footer links all three.
@@ -535,8 +537,8 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
     - **CSV.** On a closed poll, a Pro creator gets **Download votes (CSV)**. A free creator gets "Get Pro to download every vote as a CSV". Nobody else sees either.
 - **JSON API.** Paths match the roadmap exactly, with no `/api` prefix.
   - `GET /polls` → `200 {polls}`: the feed as the caller sees it (at most 20, `no-store`, tally hidden).
-  - `POST /polls` `{question?, options, target, durationHours, visibility?: "unlisted" | "public" | "private"}` → `201 {id, shareUrl, poll}`, or:
-    - `400` for bad input;
+  - `POST /polls` `{question?, options, target, durationHours, visibility?: "unlisted" | "public" | "private", publishResult?: boolean}` → `201 {id, shareUrl, poll}`, or:
+    - `400` for bad input, including `publishResult: true` with `visibility: "private"` or without a question (new, growth 2026-11-06; `publishResult` defaults to `false`);
     - `403 {error, account}` for a public poll without a credit;
     - `403 {error, plan: "free"}` for a private poll without Pro (new in M3);
     - `415` for a non-JSON body.
@@ -564,7 +566,7 @@ Not checked: it hasn't run on a real device or simulator, since this Mac has nei
       - `503` if Stripe isn't configured.
       - The account cookie is set if missing.
     - `POST /stripe/webhook` (Stripe only) → `200 {received: true}`, `400` for a bad signature or body, `503` without `STRIPE_WEBHOOK_SECRET`.
-  - `poll` = `{id, question, options[{text, imageUrl}], target, visibility, status: open|closed|no_result, winner, voteCount, tally, myVote, mine, createdAt, closesAt, closedAt}`.
+  - `poll` = `{id, question, options[{text, imageUrl}], target, visibility, publishResult, status: open|closed|no_result, winner, voteCount, tally, myVote, mine, createdAt, closesAt, closedAt}`.
     - `winner` and `tally` are `null` while open.
     - On a private poll they're also `null` for everyone but the creator (`mine: false`), even once closed.
 - **Credit rule.** `credits = floor(votes on other people's polls / 5) − public polls posted`.
@@ -694,7 +696,7 @@ SELECT account_id, count(*) FROM payments GROUP BY account_id HAVING count(*) > 
 ```
 - **A refund** is done in the Stripe dashboard. To also take Pro away, run `DELETE FROM payments WHERE session_id = 'cs_…'`. Private polls already created stay private.
 - **Not built from the PRD's paid tier: higher vote targets.** ROADMAP's M3 doesn't list them. The follow-up is a per-plan `MAX_TARGET` in `lib/limits.ts`, checked with the plan after validation, the same way `private` is.
-- **New DDL still goes last in `SCHEMA` (`lib/db.ts`),** with `SCHEMA_SENTINEL` pointed at the table or index it creates. It's now `images_unused_idx` (photo upload).
+- **New DDL still goes last in `SCHEMA` (`lib/db.ts`),** with `SCHEMA_SENTINEL` pointed at the table or index it creates. It's now `polls_published_idx` (public result pages, growth 2026-11-06).
 
 - **Moderation, by hand for now.** The owner can list hidden polls in the Neon SQL editor:
   ```sql

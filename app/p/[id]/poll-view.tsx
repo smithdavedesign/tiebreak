@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AccountView } from '@/lib/credits'
 import type { Plan } from '@/lib/plans'
 import type { PollView as Poll } from '@/lib/polls'
+import { resultPath } from '@/lib/results'
 import { CreditMeter, Face, LETTERS, Picker, ReportButton, labelOf } from '@/app/poll-parts'
 
 const TICK_MS = 30_000
@@ -103,8 +104,15 @@ export function PollView({ initial, justCreated, plan }: { initial: Poll; justCr
         </div>
       )}
       {!open && (resultHidden ? <PrivateResult poll={poll} /> : <Result poll={poll} />)}
+      {poll.status === 'closed' && poll.publishResult && (
+        // A plain <a>: the result page's visit carries its path (lib/results.ts), counted on a full page load.
+        <p className="hint">
+          {poll.mine ? 'You published this result' : 'Its creator published this result'}:{' '}
+          <a href={resultPath(poll)}>see its public page</a>.
+        </p>
+      )}
       {!open && poll.mine && <Export id={poll.id} plan={plan} />}
-      {!poll.mine && (poll.myVote !== null || !open) && <MakeYourOwn />}
+      {!poll.mine && (poll.myVote !== null || !open) && <MakeYourOwn tag="poll" />}
 
       {notice && (
         <p className="notice" role="status">
@@ -194,16 +202,17 @@ function PrivateResult({ poll }: { poll: Poll }) {
 
 /**
  * The voter loop: once someone has voted here (or the poll closed before they could), invite
- * them to post their own. A plain <a>, not <Link>: the full page load runs the layout's visit
- * beacon on arrival, which records the ref=poll tag.
+ * them to post their own; a published result's page (app/results) invites its readers too.
+ * A plain <a>, not <Link>: the full page load runs the layout's visit beacon on arrival, which
+ * records the tag (ref=poll from a poll page, ref=result from a result page).
  */
-function MakeYourOwn() {
+export function MakeYourOwn({ tag }: { tag: 'poll' | 'result' }) {
   return (
     <div className="card make-own">
       <p>
         <b>Stuck on a choice of your own?</b> Post 2–4 options and share the link. It&apos;s free.
       </p>
-      <a className="button" href="/?ref=poll">
+      <a className="button" href={`/?ref=${tag}`}>
         Make your own tiebreak
       </a>
     </div>

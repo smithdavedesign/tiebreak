@@ -10,6 +10,7 @@ import { sendSignal } from '@/lib/beacon'
 import { GUIDES } from '@/lib/guides'
 import { PUBLIC_PAGES, SIGNAL_URL, SITE_URL } from '@/lib/site'
 import { COVER_HEIGHTS, ETSY_CROPS, TOOLS, isToolPath } from '@/lib/tools'
+import { useTestDb } from './helpers'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
@@ -29,6 +30,9 @@ const pages = {
 const paths = Object.keys(pages) as (keyof typeof pages)[]
 const toolOf = (path: string) => TOOLS.find((t) => t.path === path)!
 
+// The sitemap now also lists published poll results, so it reads the (test) database.
+useTestDb()
+
 /** The <title> a page ends up with, through the layout's "%s · tiebreak" template. */
 const titleOf = (path: keyof typeof pages) => `${String(pages[path].metadata.title)} · tiebreak`
 const textOf = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
@@ -38,9 +42,9 @@ const count = (html: string, re: RegExp) => html.match(re)?.length ?? 0
 const three = ['A', 'B', 'C'].map((letter, i) => ({ letter, src: `blob:http://localhost/${i}`, name: `mug-${i}.jpg` }))
 
 describe('the tool pages', () => {
-  it('are the TOOLS list, and all in PUBLIC_PAGES and the sitemap', () => {
+  it('are the TOOLS list, and all in PUBLIC_PAGES and the sitemap', async () => {
     expect(TOOLS.map((t) => t.path).sort()).toEqual([...paths].sort())
-    const urls = sitemap().map((e) => e.url)
+    const urls = (await sitemap()).map((e) => e.url)
     for (const path of paths) {
       expect(PUBLIC_PAGES).toContain(path)
       expect(urls).toContain(`${SITE_URL}${path}`)

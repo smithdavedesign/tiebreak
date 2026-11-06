@@ -13,7 +13,10 @@ export const HOME_TITLE = 'tiebreak — let strangers break the tie'
 export const SITE_DESCRIPTION =
   "Can't choose? Post 2–4 options, share the link, and let people swipe to pick one. The poll closes at your vote target or deadline."
 
-/** The public pages search engines should list (poll pages are people's own links, so they're left out). */
+/**
+ * The public pages search engines should list (poll pages are people's own links, so they're left out). The
+ * sitemap adds the published poll results from the database (app/sitemap.ts, lib/results.ts).
+ */
 export const PUBLIC_PAGES = [
   '/',
   '/feed',

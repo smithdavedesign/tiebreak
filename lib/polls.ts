@@ -1,6 +1,6 @@
-// Polls: validation, the close rule, the public feed, reports, the CSV export
-// and their SQL (credits and plans have their own modules). Route handlers and
-// pages call these; nothing here knows about HTTP.
+// Polls: validation, the close rule, the public feed, reports, the CSV export,
+// published results and their SQL (credits and plans have their own modules).
+// Route handlers and pages call these; nothing here knows about HTTP.
 import { randomBytes } from 'node:crypto'
 import { accountOf, lockAccount, type AccountView } from './credits'
 import { toCsv } from './csv'
@@ -55,6 +55,8 @@ export interface NewPoll {
   target: number
   durationHours: number
   visibility: Visibility
+  /** Show the result at /results/<slug> once it closes (never for a private poll; needs a question). */
+  publishResult: boolean
   /** Options whose image is a photo uploaded to tiebreak rather than a link. */
   uploads: Upload[]
 }
@@ -65,6 +67,8 @@ export interface PollView {
   options: Option[]
   target: number
   visibility: Visibility
+  /** The creator opted in to a public result page (lib/results.ts), shown once the poll closes with votes. */
+  publishResult: boolean
   status: Status
   /** Index of the winning option; null while open, on a tie, or with no votes. */
   winner: number | null
@@ -86,6 +90,7 @@ interface PollRow {
   options: Option[]
   target: number
   visibility: Visibility
+  publish_result: boolean
   creator_id: string | null
   status: Status
   winner: number | null
@@ -142,7 +147,7 @@ function parseOption(value: unknown, ownOrigin: string | undefined): { option: O
 export function parseNewPoll(input: unknown, ownOrigin?: string): Parsed<NewPoll> {
   if (!isRecord(input)) return { ok: false, error: 'Send a JSON object' }
 
-  const { question = '', options, target, durationHours, visibility = 'unlisted' } = input
+  const { question = '', options, target, durationHours, visibility = 'unlisted', publishResult = false } = input
   if (typeof question !== 'string' || question.trim().length > MAX_QUESTION_LENGTH) {
     return { ok: false, error: `question must be text of at most ${MAX_QUESTION_LENGTH} characters` }
   }
@@ -171,9 +176,16 @@ export function parseNewPoll(input: unknown, ownOrigin?: string): Parsed<NewPoll
   if (!isVisibility(visibility)) {
     return { ok: false, error: `visibility must be one of: ${VISIBILITIES.join(', ')}` }
   }
+  if (typeof publishResult !== 'boolean') return { ok: false, error: 'publishResult must be true or false' }
+  if (publishResult && visibility === 'private') {
+    return { ok: false, error: "A private poll's result can't be published: choose one or the other" }
+  }
+  if (publishResult && question.trim() === '') {
+    return { ok: false, error: 'Add a question to publish the result: it is the title of the result page' }
+  }
   return {
     ok: true,
-    value: { question: question.trim(), options: parsedOptions, target, durationHours, visibility, uploads },
+    value: { question: question.trim(), options: parsedOptions, target, durationHours, visibility, publishResult, uploads },
   }
 }
 
@@ -233,6 +245,7 @@ function viewOf(
     options: row.options,
     target: row.target,
     visibility: row.visibility,
+    publishResult: row.publish_result,
     status: row.status,
     winner: hidden ? null : row.winner,
     voteCount: counts.voteCount,
@@ -295,8 +308,8 @@ export async function createPoll(poll: NewPoll, creatorId: string, now = new Dat
     const id = randomBytes(9).toString('base64url')
     const closesAt = new Date(now.getTime() + poll.durationHours * HOUR_MS)
     const { rows } = await sql.query<PollRow>(
-      `INSERT INTO polls (id, question, options, target, closes_at, created_at, visibility, creator_id)
-       VALUES ($1, $2, $3::jsonb, $4, $5::timestamptz, $6::timestamptz, $7, $8)
+      `INSERT INTO polls (id, question, options, target, closes_at, created_at, visibility, creator_id, publish_result)
+       VALUES ($1, $2, $3::jsonb, $4, $5::timestamptz, $6::timestamptz, $7, $8, $9)
        RETURNING *`,
       [
         id,
@@ -307,6 +320,7 @@ export async function createPoll(poll: NewPoll, creatorId: string, now = new Dat
         now.toISOString(),
         poll.visibility,
         creatorId,
+        poll.publishResult,
       ],
     )
     if (hasUploads) await claimUploads(sql, id, poll.uploads)
@@ -413,6 +427,59 @@ export async function listFeed(viewerId: string | null, now = new Date()): Promi
     [viewerId, now.toISOString(), REPORTS_TO_HIDE, FEED_PAGE_SIZE, HOUSE_ID],
   )
   return rows.map((row) => viewOf(row, viewerId, { voteCount: row.vote_count, tally: null }, null))
+}
+
+// ── Public result pages (growth, 2026-11-06; lib/results.ts) ────────────────
+
+/**
+ * When a poll's result is public, as a WHERE clause on `polls p` ($1 = REPORTS_TO_HIDE): its creator opted in,
+ * it closed with votes (a tie counts; `no_result` has nothing to show), it isn't private (the database refuses
+ * that anyway) and reports haven't hidden it.
+ */
+const PUBLISHED = `p.publish_result AND p.status = 'closed' AND p.visibility <> 'private'
+  AND (SELECT count(*) FROM reports r WHERE r.poll_id = p.id) < $1`
+
+/** Overdue published polls the sitemap closes per read; any left over close on the next read. */
+const OVERDUE_CLOSES_PER_READ = 20
+/** The sitemap lists the newest this many results (one sitemap file holds 50,000 URLs). */
+const MAX_LISTED_RESULTS = 10_000
+
+export interface PublishedResult {
+  id: string
+  question: string
+  closedAt: string
+}
+
+/**
+ * A published result as anyone sees it (no viewer), or null if it isn't public (see PUBLISHED). Like any read,
+ * it first closes the poll if its deadline has passed.
+ */
+export async function getPublishedResult(id: string, now = new Date()): Promise<PollView | null> {
+  const poll = await getPoll(id, null, now)
+  if (!poll) return null
+  const db = await getDb()
+  const { rows } = await db.query(`SELECT 1 FROM polls p WHERE p.id = $2 AND ${PUBLISHED}`, [REPORTS_TO_HIDE, id])
+  return rows.length > 0 ? poll : null
+}
+
+/**
+ * The published results for the sitemap, newest first. Polls close lazily (on a read or a vote), so a published
+ * poll whose deadline passed with nobody looking is closed here first; otherwise it would never be listed.
+ */
+export async function listPublishedResults(now = new Date()): Promise<PublishedResult[]> {
+  const db = await getDb()
+  const overdue = await db.query<{ id: string }>(
+    `SELECT id FROM polls WHERE publish_result AND status = 'open' AND closes_at <= $1::timestamptz
+      ORDER BY closes_at LIMIT $2`,
+    [now.toISOString(), OVERDUE_CLOSES_PER_READ],
+  )
+  for (const { id } of overdue.rows) await getPoll(id, null, now)
+  const { rows } = await db.query<{ id: string; question: string; closed_at: Date | string }>(
+    `SELECT p.id, p.question, p.closed_at FROM polls p WHERE ${PUBLISHED}
+      ORDER BY p.closed_at DESC, p.id LIMIT $2`,
+    [REPORTS_TO_HIDE, MAX_LISTED_RESULTS],
+  )
+  return rows.map((row) => ({ id: row.id, question: row.question, closedAt: iso(row.closed_at) }))
 }
 
 export type ReportResult = 'ok' | 'not_found' | 'duplicate'

@@ -79,6 +79,7 @@ export default async function setup(project: TestProject) {
       fetch(`${base}/images/AAAAAAAAAAAAAAAA`),
       fetch(`${base}/polls`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }),
       fetch(`${base}/p/AAAAAAAAAAAA`),
+      fetch(`${base}/p/AAAAAAAAAAAA/card`),
       fetch(`${base}/tools/etsy-thumbnail-preview`),
       fetch(`${base}/tools/book-cover-thumbnail-test`),
       fetch(`${base}/tools/youtube-thumbnail-preview`),

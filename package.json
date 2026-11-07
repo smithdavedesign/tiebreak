@@ -10,9 +10,9 @@
     "test": "vitest run",
     "screenshots": "node scripts/screenshots.mjs",
     "typecheck": "tsc --noEmit",
-    "cf:build": "NEXT_PUBLIC_DEPLOY_ENV=production opennextjs-cloudflare build",
+    "cf:build": "NEXT_PUBLIC_DEPLOY_ENV=production NEXT_PUBLIC_SITE_URL=https://tiebreak.1426davejobs.workers.dev opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "deploy": "npm run cf:build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.15",

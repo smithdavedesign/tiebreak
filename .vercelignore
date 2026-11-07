@@ -1,4 +1,4 @@
-# The native app (Expo) has its own package and build; Vercel serves only the web app and API.
+# The native app (Expo) has its own package and build. Vercel only redirects to the Workers site (vercel.json).
 mobile/
 # Cloudflare build output (never uploaded to Vercel).
 .open-next/

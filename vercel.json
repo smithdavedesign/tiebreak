@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "",
+  "buildCommand": "echo 'tiebreak runs on Cloudflare Workers. This Vercel project only redirects there (vercel.json, GROWTH.md 2026-11-07)'",
+  "outputDirectory": "vercel-redirect",
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "destination": "https://tiebreak.1426davejobs.workers.dev/:path",
+      "permanent": true
+    }
+  ]
+}

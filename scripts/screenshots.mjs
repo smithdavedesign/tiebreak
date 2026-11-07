@@ -1,11 +1,20 @@
-// npm run screenshots: starts the app, drives the main job with Playwright at
-// desktop and phone size, saves PNGs to docs/screenshots/ and stops the app. Not
-// part of `npm test`. The flow: a seller posts a poll with a photo for each option;
-// its link unfurls as the poll's share card; a stranger opens the link, votes and is
-// offered "Make your own tiebreak", which opens the start page; two more votes close
-// the poll, and its card shows the winner and the split. The cards are images
-// (1200×630), so they're taken once, at desktop size. The sample photos are drawn in
-// the browser (two mugs), so no real photo is used.
+// npm run screenshots: starts the app, drives it with Playwright at desktop and
+// phone size, saves PNGs to docs/screenshots/ and stops the app. Not part of
+// `npm test`.
+//
+// What it shows (growth, 2026-11-07: the old Vercel deploy now redirects to the
+// Workers site):
+// - redirect.png: vercel.json's redirect answering real HEAD and POST requests, on
+//   a local stand-in for Vercel's router (tests/redirect-to-workers.ts), plus the
+//   config Vercel builds. The deployed redirect is checked by tests/live-site.test.ts.
+// - workers-build.png: the app run with the env the Workers build sets (package.json
+//   cf:build): each public page's canonical link, read from its HTML, and the visit
+//   beacon's requests per page load at 1280 and 390 px. Signals are answered here;
+//   nothing reaches RepoHQ.
+// - The main job, at desktop and phone size: a seller posts a poll with a photo for
+//   each option; two strangers vote; a third opens the link and casts the vote that
+//   closes it, and sees the result and "Make your own tiebreak", which opens the
+//   start page. The sample photos are drawn in the browser (two mugs).
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
@@ -13,9 +22,15 @@
 // never sees a real database or Stripe setting from this shell: those variables
 // are dropped.
 import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { readFileSync } from 'node:fs'
 import { mkdir, readdir, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices } from 'playwright-core'
+// TypeScript modules with no aliases; Node strips their types.
+import { PUBLIC_PAGES, SIGNAL_URL } from '../lib/site.ts'
+import { VERCEL_URL, canonicalOf, readVercelConfig, scriptEnv, vercelRedirect } from '../tests/redirect-to-workers.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const outDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url))
@@ -27,17 +42,28 @@ const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
 const SIZES = ['desktop', 'mobile']
-const SHOTS = ['card-open.png', 'card-result.png', ...['voted', 'home'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))]
+const DESKTOP = { viewport: { width: 1280, height: 800 } }
+const PHONE = devices['iPhone 13']
+const SHOTS = ['redirect.png', 'workers-build.png', ...['result', 'home'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))]
+const SIGNALS = `${new URL(SIGNAL_URL).origin}/**`
 
 if (!process.env.CHROMIUM_PATH) {
   console.error('Set CHROMIUM_PATH to a Chromium or Chrome binary (no browser is downloaded).')
   process.exit(1)
 }
 
-// Sample data only: no real database, no real Stripe, no visit beacon (not production).
+// The build-time env the Workers deploy sets (its address, and production, so the beacon is armed).
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+const workersEnv = scriptEnv(pkg.scripts['cf:build'])
+
+// Sample data only: no real database, no real Stripe, no deploy env from this shell.
 const appEnv = Object.fromEntries(
   Object.entries(process.env).filter(
-    ([name]) => name !== 'DATABASE_URL' && !name.startsWith('STRIPE_') && !name.endsWith('VERCEL_ENV'),
+    ([name]) =>
+      name !== 'DATABASE_URL' &&
+      !name.startsWith('STRIPE_') &&
+      !name.endsWith('VERCEL_ENV') &&
+      !(name in workersEnv),
   ),
 )
 const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '-p', String(port)], {
@@ -46,6 +72,7 @@ const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '
   stdio: 'ignore',
   env: {
     ...appEnv,
+    ...workersEnv,
     NEXT_TELEMETRY_DISABLED: '1',
     HOUSE_POLLS: 'off',
   },
@@ -191,20 +218,29 @@ async function waitForImages(page, selector) {
   for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
 }
 
-/** A poll's share card, opened as an image (what a chat app or social site shows for the link). */
-async function shotOfCard(page, path, file) {
-  const res = await page.goto(`${base}${path}`)
-  if (res?.status() !== 200 || res.headers()['content-type'] !== 'image/png') {
-    throw new Error(`The card at ${path} answered ${res?.status()} ${res?.headers()['content-type']}`)
-  }
-  await page.screenshot({ path: `${outDir}${file}` })
+/**
+ * A browser context whose RepoHQ signals are answered here (the app runs with the beacon armed, as on
+ * Workers), each recorded in `signals` with the page that sent it. `counted` clears navigator.webdriver,
+ * which otherwise keeps automated browsers from sending anything.
+ */
+async function newContext(browser, options, { counted = false, signals = [] } = {}) {
+  const context = await browser.newContext(options)
+  if (counted) await context.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }))
+  await context.route(SIGNALS, async (route) => {
+    const request = route.request()
+    let body = null
+    try {
+      body = JSON.parse(request.postData() ?? 'null')
+    } catch {}
+    signals.push({ url: request.url(), page: request.frame().url(), body })
+    await route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
+  })
+  return context
 }
 
 async function run(browser, label, contextOptions) {
-  const desktop = label === 'desktop'
-
   // 1. A seller posts a poll with a photo for each option (the main job).
-  const seller = await browser.newContext(contextOptions)
+  const seller = await newContext(browser, contextOptions)
   const page = await seller.newPage()
   await page.goto(base)
   await page.getByLabel('Option A text').waitFor()
@@ -221,19 +257,22 @@ async function run(browser, label, contextOptions) {
   await page.getByText('Your poll is live').waitFor()
   const id = new URL(page.url()).pathname.split('/').pop()
 
-  // 2. What its link unfurls as: the poll's own card, the question and both photos.
-  if (desktop) await shotOfCard(page, `/p/${id}/card?v=open`, 'card-open.png')
+  // 2. Two strangers vote on the shared link, one for each option: 2 of 3 votes.
+  await strangerVotes(id, 0)
+  await strangerVotes(id, 1)
 
-  // 3. A stranger opens the shared link (no cookie: a new anonymous account), picks
-  // one, and is offered a poll of their own.
-  const stranger = await browser.newContext(contextOptions)
+  // 3. A third stranger opens the link (no cookie: a new anonymous account) and picks
+  // A, which closes the poll at its target: the result, and a poll of their own.
+  const stranger = await newContext(browser, contextOptions)
   const voter = await stranger.newPage()
   await voter.goto(`${base}/p/${id}`)
   await waitForImages(voter, '.swipe-card img')
   await voter.getByRole('button', { name: 'Pick A' }).click()
+  await voter.getByText(/^Winner: A/).waitFor()
   const makeYourOwn = voter.getByRole('link', { name: 'Make your own tiebreak' })
   await makeYourOwn.waitFor()
-  await shot(voter, `voted-${label}.png`)
+  await waitForImages(voter, 'main img')
+  await shot(voter, `result-${label}.png`)
 
   // 4. The link opens the start page, tagged ?ref=poll for the visit counter.
   await makeYourOwn.click()
@@ -241,15 +280,128 @@ async function run(browser, label, contextOptions) {
   await voter.getByLabel('Question').waitFor()
   await shot(voter, `home-${label}.png`)
 
-  // 5. Two more strangers vote; the poll closes at 3, and its card shows the winner and the split.
-  if (desktop) {
-    await strangerVotes(id, 0)
-    await strangerVotes(id, 1)
-    await shotOfCard(page, `/p/${id}/card?v=closed`, 'card-result.png')
-  }
-
   await stranger.close()
   await seller.close()
+}
+
+/** A plain HTML page of evidence, at desktop size. */
+async function shotOfPage(browser, file, title, body) {
+  const context = await browser.newContext(DESKTOP)
+  const page = await context.newPage()
+  await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+    body { font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 24px 32px; color: #1d1d1f; background: #f4f4f6 }
+    h1 { font-size: 20px; margin: 0 0 6px } h2 { font-size: 15px; margin: 18px 0 6px }
+    p { margin: 4px 0 } .note { color: #555 }
+    table { border-collapse: collapse; background: #fff; width: 100% }
+    th, td { text-align: left; padding: 4px 8px; border: 1px solid #ddd; vertical-align: top }
+    th { background: #ececf0 } .ok { color: #137333; font-weight: bold }
+    pre { background: #fff; border: 1px solid #ddd; padding: 8px 10px; margin: 0; white-space: pre-wrap }
+  </style></head><body><h1>${esc(title)}</h1>${body}</body></html>`)
+  await page.screenshot({ path: `${outDir}${file}` })
+  await context.close()
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const row = (cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`
+
+/**
+ * vercel.json's redirect, answering real requests: a local HTTP server that applies the file's rules the
+ * way Vercel's router does (tests/redirect-to-workers.ts). Not the live deploy, which isn't reachable from
+ * a build; tests/live-site.test.ts checks that one.
+ */
+async function redirectEvidence() {
+  const config = readVercelConfig()
+  const server = createServer((req, res) => {
+    const answer = vercelRedirect(config, req.url ?? '/')
+    res.writeHead(answer?.status ?? 404, answer ? { location: answer.location } : {})
+    res.end()
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const standIn = `http://127.0.0.1:${server.address().port}`
+  const requests = [
+    ['HEAD', '/'],
+    ['HEAD', '/polls/abc123'],
+    ['HEAD', '/polls/abc123?src=x'],
+    ['HEAD', '/p/K6voqRLCfGQ0?ref=poll'],
+    ['POST', '/polls/abc123/votes'],
+  ]
+  const answers = []
+  try {
+    for (const [method, path] of requests) {
+      const res = await fetch(`${standIn}${path}`, { method, redirect: 'manual', ...(method === 'POST' ? { body: '{"option":0}' } : {}) })
+      answers.push([method, path, res.status, res.headers.get('location')])
+    }
+  } finally {
+    server.close()
+  }
+  return { config, answers }
+}
+
+/** Each public page's canonical link, from the HTML the app serves with the Workers build's env. */
+async function canonicalEvidence() {
+  const found = []
+  for (const path of PUBLIC_PAGES) {
+    const res = await fetch(`${base}${path}`)
+    found.push([path, res.status, canonicalOf(await res.text())])
+  }
+  return found
+}
+
+/** The visit beacon on one page load, in a fresh browser session the beacon counts. */
+async function beaconEvidence(browser, label, options) {
+  const signals = []
+  const context = await newContext(browser, options, { counted: true, signals })
+  const page = await context.newPage()
+  const width = page.viewportSize()?.width
+  await page.goto(`${base}/`)
+  await page.getByLabel('Question').waitFor()
+  await page.waitForTimeout(3_000) // and no second visit
+  await context.close()
+  const visits = signals.filter((s) => s.url === SIGNAL_URL && s.body?.kind === 'visit')
+  return [label, width, visits]
+}
+
+async function evidenceShots(browser, redirect, canonicals, beacons) {
+  // Evidence that doesn't hold is a failed run, not a screenshot.
+  const workersHost = new URL(workersEnv.NEXT_PUBLIC_SITE_URL).host
+  for (const [, , status, loc] of redirect.answers) if (status !== 308 || !loc) throw new Error(`Redirect answered ${status} ${loc}`)
+  for (const [path, , href] of canonicals) {
+    if (!href || new URL(href).host !== workersHost) throw new Error(`${path}: canonical ${href} is not on ${workersHost}`)
+  }
+  for (const [label, , visits] of beacons) if (visits.length !== 1) throw new Error(`${label}: ${visits.length} visit beacons`)
+
+  const location = (l) => (l ? esc(l) : '<em>none</em>')
+  await shotOfPage(
+    browser,
+    'redirect.png',
+    'tiebreak-phi.vercel.app now redirects everything to the Workers site',
+    `<p class="note">vercel.json's rule answering real requests on a local stand-in for Vercel's router
+      (tests/redirect-to-workers.ts), as ${esc(VERCEL_URL)} will once deployed. The live redirect is checked by
+      tests/live-site.test.ts (LIVE_SITE=1).</p>
+    <h2>Requests and answers</h2>
+    <table><tr><th>Request</th><th>Status</th><th>Location</th></tr>
+      ${redirect.answers.map(([method, path, status, loc]) => row([`${method} ${esc(VERCEL_URL)}${esc(path)}`, `<span class="ok">${status}</span>`, location(loc)])).join('')}
+    </table>
+    <p class="note">308 keeps the method and body, so the native app's POSTs to the old API address still arrive.</p>
+    <h2>vercel.json: what Vercel builds (no install, no Next.js build, one static page it never serves)</h2>
+    <pre>${esc(JSON.stringify(redirect.config, null, 2))}</pre>`,
+  )
+  await shotOfPage(
+    browser,
+    'workers-build.png',
+    'The Workers build: canonical links on the Workers host, one visit beacon per page load',
+    `<p class="note">The app run on localhost with the env package.json's cf:build sets:
+      ${Object.entries(workersEnv).map(([k, v]) => `${esc(k)}=${esc(v)}`).join(' ')}</p>
+    <h2>&lt;link rel="canonical"&gt; of every public page, read from its HTML</h2>
+    <table><tr><th>Page</th><th>Status</th><th>Canonical</th></tr>
+      ${canonicals.map(([path, status, href]) => row([esc(path), String(status), location(href)])).join('')}
+    </table>
+    <h2>Visit beacon: requests to ${esc(SIGNAL_URL)} per page load (fresh session; answered here, not sent)</h2>
+    <table><tr><th>Browser</th><th>Width</th><th>Visit requests</th><th>Sent from page</th></tr>
+      ${beacons.map(([label, width, visits]) => row([esc(label), `${width} px`, `<span class="ok">${visits.length}</span>`, esc(visits.map((v) => v.page).join(', '))])).join('')}
+    </table>`,
+  )
 }
 
 /** This script owns docs/screenshots/: PNGs from older runs that it no longer takes go. */
@@ -266,8 +418,12 @@ try {
   await waitForApp()
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
   try {
-    await run(browser, 'desktop', { viewport: { width: 1280, height: 800 } })
-    await run(browser, 'mobile', { ...devices['iPhone 13'] })
+    const redirect = await redirectEvidence()
+    const canonicals = await canonicalEvidence()
+    const beacons = [await beaconEvidence(browser, 'Desktop', DESKTOP), await beaconEvidence(browser, 'iPhone 13', PHONE)]
+    await run(browser, 'desktop', DESKTOP)
+    await run(browser, 'mobile', PHONE)
+    await evidenceShots(browser, redirect, canonicals, beacons)
   } finally {
     await browser.close()
   }

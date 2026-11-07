@@ -10,10 +10,12 @@ import { PollView } from './poll-view'
 
 /**
  * A poll's own title and share card (its question and options, then its result: GET /p/:id/card);
- * kept out of search (it's someone's link, not a page to find).
+ * kept out of search (it's someone's link, not a page to find). Its canonical URL is its own address on the
+ * site's host, without the `?new=1` or `?ref=` a shared link may carry (GROWTH.md 2026-11-07).
  */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
+  const path = `/p/${encodeURIComponent(id)}`
   const poll = await getPoll(id, null).catch(() => null)
   const title = poll?.question || 'Help me decide'
   const description = poll
@@ -26,8 +28,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     robots: { index: false, follow: false },
+    alternates: { canonical: path },
     // Replaces the layout's share tags wholesale, so the site name goes in again.
-    openGraph: { type: 'website', siteName: SITE_NAME, url: `/p/${id}`, title, description, images: [image] },
+    openGraph: { type: 'website', siteName: SITE_NAME, url: path, title, description, images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   }
 }

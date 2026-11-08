@@ -10,7 +10,9 @@ import { PollView } from './poll-view'
 
 /**
  * A poll's own title and share card (its question and options, then its result: GET /p/:id/card);
- * kept out of search (it's someone's link, not a page to find).
+ * kept out of search (it's someone's link, not a page to find), yet still naming its own address on the
+ * site's host as canonical, without tags like ?ref= or ?new=1. A missing poll is a 404, whose metadata
+ * comes from app/not-found.tsx instead.
  */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -26,6 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     robots: { index: false, follow: false },
+    alternates: { canonical: `/p/${id}` },
     // Replaces the layout's share tags wholesale, so the site name goes in again.
     openGraph: { type: 'website', siteName: SITE_NAME, url: `/p/${id}`, title, description, images: [image] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },

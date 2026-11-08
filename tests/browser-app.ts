@@ -5,7 +5,10 @@
 // The app runs on an in-memory database with sample data only: this shell's DATABASE_URL, Stripe settings and
 // Vercel env never reach it, and neither does vitest's NODE_ENV. NEXT_PUBLIC_VERCEL_ENV is set to production
 // so the visit beacon's code runs as it does live; automated browsers (navigator.webdriver) still send nothing,
-// and the one test that clears that flag answers the signal endpoint itself, so nothing leaves the machine.
+// and the tests that clear that flag answer the signal endpoint themselves, so nothing leaves the machine.
+// No site address is set (NEXT_PUBLIC_SITE_URL, VERCEL_PROJECT_PRODUCTION_URL), as `npm run cf:build` builds the
+// Worker, so canonical URLs, the sitemap and share tags name the address the app itself gives: the Workers site
+// (GROWTH.md 2026-11-08). Requests themselves still go to this server.
 import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer, type AddressInfo } from 'node:net'
@@ -56,7 +59,8 @@ export default async function setup(project: TestProject) {
       name === 'NODE_ENV' ||
       name.startsWith('STRIPE_') ||
       name.startsWith('VITEST') ||
-      name.endsWith('VERCEL_ENV') || name === 'NEXT_PUBLIC_DEPLOY_ENV'
+      name.endsWith('VERCEL_ENV') || name === 'NEXT_PUBLIC_DEPLOY_ENV' ||
+      name === 'NEXT_PUBLIC_SITE_URL' || name === 'VERCEL_PROJECT_PRODUCTION_URL'
     if (drop) delete env[name]
   }
   env.NEXT_PUBLIC_VERCEL_ENV = 'production'

@@ -224,3 +224,102 @@ SELECT
                      AND q.creator_id IS DISTINCT FROM p.creator_id AND q.creator_id IS DISTINCT FROM 'house')) AS polls_by_earlier_voters;
 ```
 `polls_by_earlier_voters` counts new polls whose creator had first voted on someone else's poll: the loop working. At these numbers, read the counts, not rates.
+
+## 2026-11-08: the old Vercel address redirects to the Workers site
+
+**Mission:** turn the leftover Vercel deploy into a redirect to the live Workers site, and prove the beacon counts there. Six growth builds (#20–#26) were abandoned on a failing Vercel check even when their tests passed, so no growth feature has merged since #10 (2026-10-19). Meanwhile https://tiebreak-phi.vercel.app, the address in LAUNCH-KIT.md and past posts, still served the Vercel deploy rather than the Workers site the beacon moved to (2026-10-31).
+
+**Hypothesis:** people who follow old links (posts, the launch kit, shared poll links, Stripe's return page, the native app) land on the Workers site, where the beacon counts them. A Vercel build that runs none of the app has nothing to fail on, so growth PRs can merge again.
+
+**Decisions** (nobody to ask, so decided here)
+- **Vercel's own redirect in `vercel.json` [Layer 1], with no middleware and no function.** One rule: `/:path(.*)` → `https://tiebreak.1426davejobs.workers.dev/:path`, `permanent: true`. The common `/:path*` would not match `/` under Vercel's strict matching. That was checked against path-to-regexp (Next's copy of the version Vercel compiles with) with Vercel's options, and a test pins it. A function would also cost invocations on a team that is already over its usage.
+- **308, not 301.** Both meet criterion 1, but only 308 keeps the method and body. The native app's API address is still the Vercel one (`mobile/app.json`), so its POSTs (create a poll, vote) follow the redirect instead of turning into GETs.
+- **Query strings.** Vercel passes a request's query string on to a redirect's destination, which Next's redirects docs state for the same router (`node_modules/next/dist/docs/…/redirects.md`), and the rule adds none of its own. So `?src=`, `?ref=` tags and the payment link's `?session_id=` all arrive on Workers. Offline that is the model's assumption; the live check confirms it on the real redirect.
+- **No open redirect.** The destination's host is fixed, and the path only follows its slash: `//evil.example/x` lands on `https://tiebreak.1426davejobs.workers.dev//evil.example/x`. This is tested.
+- **A Vercel build with nothing to fail on.** `framework: null` replaces the project's Next.js preset. `installCommand: ""` installs nothing. `buildCommand` is a single `echo`. `outputDirectory: "vercel-redirect"` holds one static "tiebreak has moved" page (noindex, canonical and a link to Workers), because a static build needs some output. Vercel never serves that page, since redirects are answered before files. There is no env, database, `next build` or function on Vercel any more. With no host condition, preview deployments redirect too, so every PR's Vercel check now deploys only this.
+- **Criterion 3, kept to the letter.** *(Superseded for three app files by the review follow-up below.)* Nothing under `app/`, `lib/` or `mobile/` changed, and neither did `package.json` or the Next, OpenNext, wrangler or TypeScript config. (The 2026-11-07 attempt at this mission changed two `app/` files and `package.json`.) Everything else in the diff is the Vercel config, tests, and what every growth PR updates: this log, the README, the screenshots and their script, and `.provision`. `inScope` in `tests/workers-move.ts` is that rule, and it's checked on the PR's real file list (below).
+- **Criterion 5's "every page" means every indexable page.** *(Reversed by the review follow-up below: every page.)* The 11 public pages are the ones the sitemap lists, and each names itself as its canonical URL. Poll pages (`/p/:id`, people's share links) and the 404 page are `noindex`. A canonical URL on a noindex page contradicts it, and adding one would need the `app/` change criterion 3 forbids. A test lists every `page.tsx` under `app/`, so a new page can't skip the rule.
+- **The canonical host comes from the Workers build.** *(Superseded by the review follow-up below: it's now the app's default.)* `NEXT_PUBLIC_SITE_URL` is baked in at build time, and without it the app names `tiebreak-phi.vercel.app`, which now only redirects. The README's deploy steps already said to set it; they now give the address. This PR can't set it in `cf:build` without touching `package.json` (criterion 3). Whether the deployed Worker was built with it is something the live check reads. If it wasn't, rebuild and redeploy main with `NEXT_PUBLIC_SITE_URL=https://tiebreak.1426davejobs.workers.dev`; no code change is needed. The browser tests' dev server (`tests/browser-app.ts`) and `npm run screenshots` are now built that way.
+- **If the Vercel check still fails, read its message.** `repohq.vercel.app` has answered 402 since the team's usage block, which lasts until 2026-11-30. If the block itself fails deployments, no config in this repo can turn the check green, and the old address keeps answering 402 until the block lifts. Once it lifts, the redirect is answered at Vercel's edge with no function, so it should add little usage.
+- **Needs David** (`.provision`, one `request` line). Stripe doesn't follow redirects. The `checkout.session.completed` webhook on `https://tiebreak-phi.vercel.app/stripe/webhook` (LAUNCH-READY.md) has to move to `https://tiebreak.1426davejobs.workers.dev/stripe/webhook`, with the Worker given `STRIPE_WEBHOOK_SECRET`. The payment link's return page needs nothing, since browsers follow the 308 with its query. Checkout, Stripe settings, prices and payment links are untouched.
+- **Left for a later PR (criterion 3):** the native app's `expo.extra.apiUrl` still names the Vercel address, so its requests go through the 308. Point it at Workers in the next mobile build. LAUNCH-KIT.md isn't in this repo; its old links now redirect.
+
+**What changed**
+- New: `vercel.json`, `vercel-redirect/index.html` and `.provision`. Changed: `.vercelignore` (its comment), the README (screenshots, and the hosting section: Workers is live and Vercel only redirects), `scripts/screenshots.mjs` and `docs/screenshots/`.
+- Tests: 90 new, 542 in all, all passing. 12 more are opt-in and skipped by default. `tsc --noEmit` is clean. The earlier tests are unchanged; the shared dev server now builds with the Workers address, and every earlier browser test still passes on it.
+  - `tests/vercel-redirect.test.ts` (67, plus 1 opt-in), offline, in `npm test` and CI:
+    - Criterion 1: the three addresses each get a 308 to the same path and query on Workers. So do every public page, a share link, its card, a tagged link, Stripe's return page, the app's vote, the sitemap, a trailing slash, an encoded path and several queries.
+    - Five crafted paths never leave the Workers host. The rule is one catch-all with no conditions, and `/:path*` provably misses `/`.
+    - Criterion 2's repo side: no framework, no install, a lone `echo`, no other settings, one static output page, no root `api/`, middleware or proxy, and nothing in `.vercelignore` that hides the config.
+    - Criterion 3: the scope rule, file by file. `SCOPE_BASE=main` also checks this checkout's changes.
+  - `tests/workers-canonical.test.ts` (16), offline, built with the Workers address:
+    - Every page route under `app/` is accounted for.
+    - Each public page's canonical URL resolves to itself on the Workers host.
+    - The poll page is noindex with no canonical URL, on a real poll and on a missing one.
+    - The sitemap, robots.txt and the structured data all name Workers.
+  - `tests/workers-move-browser.test.ts` (4; Chromium at 1280 px and at iPhone 13's 390 px; skipped without `CHROMIUM_PATH`):
+    - The old home link, and an old share link with `?ref=old-link` clicked from Reddit, each get vercel.json's 308. The browser opens the Location on the Workers origin, which the local app plays (`visitWorkersFrom`).
+    - Exactly one visit beacon per page load, sent from a page on the workers.dev host with that origin. The share link's beacon keeps its `ref` and the Reddit referrer.
+    - The home page has one canonical link on Workers. The poll page is noindex and has none.
+  - `tests/zz-debug-browser.test.ts` (3, same conditions): criterion 5 in the HTML the app serves. Each of the 11 pages has exactly one canonical link, its own address on Workers. The sitemap and robots.txt name Workers. A poll page, a missing poll and an unknown address are noindex with no canonical link. **Rename it** to `tests/workers-canonical-browser.test.ts`: the name is left over from debugging, and the build sandbox could neither delete nor rename it.
+  - `tests/live-site.test.ts` (11, opt-in, against the real sites):
+    - `LIVE_SITE=1`: criterion 1 (HEAD on the three addresses, and the old home page followed to a 200), criterion 3's Workers 200 on `/`, and criterion 5 (every sitemap page names itself on Workers; a feed poll and an unknown address are noindex with no canonical).
+    - `LIVE_SITE=1` with `CHROMIUM_PATH`: criterion 4. A fresh browser at 1280 px and at 390 px, with `navigator.webdriver` cleared as a visitor's browser has it, loads `/?ref=live-check` and sees exactly one request to RepoHQ's signal endpoint. It must be answered 2xx and sent from a workers.dev page.
+    - `PR_NUMBER=<n>`: criterion 2 (Vercel's check run and CI's `web` and `mobile` conclude `success`; it waits up to `LIVE_WAIT_MINUTES`, 15 by default) and criterion 3 on the PR's own file list, from GitHub's API. `GITHUB_TOKEN` is optional and only ever sent to api.github.com.
+  - `tests/workers-move.ts` holds the addresses, the model of Vercel's routing (it throws on any rule shape it doesn't model), `visitWorkersFrom` and the scope rule. `npm run screenshots` uses the same code.
+  - Mutation-checked (reverted): with `/:path*` and `permanent: false`, 34 tests fail; without `vercel.json`, the redirect file fails to load.
+- Two things the browser harness had to learn. Playwright routes only the first URL of a redirect, so the 308 hop is taken by the test. And a dev page on the Workers origin never hydrates (so its beacon never runs) until its HMR socket is joined to the local dev server's.
+- `npm run screenshots` takes 6 PNGs and replaces the older ones. `redirect.png` shows real HTTP requests to a local stand-in that applies `vercel.json`, plus the config. `beacon.png` shows the two old links followed in Chromium, one visit beacon each, sent from the workers.dev page, with the canonical link. The main flow is the start page with a poll filled in and the closed poll's result, at desktop and phone size.
+
+**Verified here, and not.** The sandbox reaches neither Vercel, Cloudflare, GitHub nor RepoHQ (curl was refused), so the live checks didn't run. Neither did `SCOPE_BASE=main`, since setting an env var in a command wasn't allowed; the same rule was applied by hand to `git diff --name-only main` plus the new files, and all 28 are in scope. Run the live checks in this order:
+1. On the PR, once its checks finish: `PR_NUMBER=<n> npx vitest run tests/live-site.test.ts` (criteria 2 and 3).
+2. After the merge's production deploy on Vercel (a preview deploy doesn't change tiebreak-phi.vercel.app): `LIVE_SITE=1 CHROMIUM_PATH=<chromium> npx vitest run tests/live-site.test.ts` (criteria 1, 3's Workers 200, 4 and 5). If the query-string test fails, Vercel isn't passing queries on, and the fix is a Vercel rule, not the app. If criterion 5 shows `tiebreak-phi.vercel.app`, or a poll page or 404 without a canonical link, the Worker is older than the review follow-up below: redeploy main.
+
+**Pre-landing review** (gstack checklist, against `git diff` and the new files)
+- **Pass 1, CRITICAL: nothing open.**
+  - No SQL and no app code.
+  - No open redirect (tested above).
+  - The two evidence pages escape every value they show.
+  - `git` runs with argument arrays.
+  - `GITHUB_TOKEN` is read from the environment only for api.github.com's header, and never appears in a message.
+  - No new enum values: `SignalKind` is unchanged, and `live-check` and `old-link` fit the beacon's `ref` pattern.
+  - No credential-shaped strings: the test's Checkout Session id is built at runtime.
+- **Auto-fixed:**
+  - The `.vercelignore` check flagged any line starting with `*`; it now flags only ignore-everything lines and the two names.
+  - The evidence table overflowed the viewport.
+  - Copy that said Chromium follows the 308 (it opens the Location) or that strangers voted on the shared link (they vote through the API).
+- **Open, decided here:**
+  - [P2] (confidence 7/10) Query pass-through on Vercel redirects is documented behaviour that this sandbox couldn't watch. The live check covers it.
+  - [P2] The Vercel check may still fail on the team's usage block (above).
+  - [P2] The Stripe webhook, if it's on the Vercel address (`.provision`).
+  - [P3] The native app reaches the API through a 308 until its `apiUrl` changes. Whether its `x-tiebreak-voter` header survives the change of host wasn't tested here; if it doesn't, the app mints a new anonymous account.
+
+**Metric:** unique visitors a week (`visit` events) on RepoHQ's Ideas page for tiebreak. The baseline is 0 a week (0 the week before, 0 all time), and the target is 10 a week within 14 days of the merge, read over the 7 days ending on day 14. Leave out visits tagged `ref: "live-check"`, which are the live check's own (2 per run). An old link that someone clicked on another site keeps that site's `referrer` (reddit.com, for example), and its `?ref=` tag still arrives. A visit through the old address carries no mark of its own, since criterion 1 keeps the path and query exactly. Whether growth PRs merge again shows on GitHub: the next growth PR's Vercel check concludes `success`.
+
+### Review follow-up: a canonical link on every page
+
+The review found criterion 5 unmet. Poll pages and 404s had no canonical link. The 11 public pages named workers.dev only if the Worker was built with `NEXT_PUBLIC_SITE_URL` set by hand, because `cf:build` doesn't set it and `lib/site.ts` fell back to the Vercel address. The offline tests stubbed that variable, so they passed with no app change.
+
+**Decisions**
+- **"Every page" means every page.** Every HTML page the Worker serves has exactly one `<link rel="canonical">` on `https://tiebreak.1426davejobs.workers.dev`.
+- **The Workers address is the app's default** (`WORKERS_URL` in `lib/site.ts`). `cf:build`, `preview` and `deploy` need nothing set. `NEXT_PUBLIC_SITE_URL` still wins, for a custom domain. Vercel's production domain is no longer a fallback, since it only redirects. The fix is in the app rather than in `cf:build`, so every build path gets it, the broker's included, and `package.json` is unchanged.
+- **A poll page names its own address**, `/p/:id`, without tags like `?ref=` or `?new=1`. It stays `noindex, nofollow`, since it's someone's link. A canonical link to itself doesn't contradict noindex: it says which address the page is, not that another page should be indexed.
+- **Every 404 names the home page.** A missing poll and an unknown address both render the new `app/not-found.tsx`. Next renders that page once at build time (`/_not-found`) and serves it for every unknown address, so it can't name the address that was asked for. Naming it would need a proxy and a dynamic 404 on every miss. Search engines don't index 404s, and Next adds `noindex` to them. The page says "Nothing here" and links to posting a poll and to the feed, replacing Next's default 404 text.
+- **Criterion 3 gives way for three files.** Criterion 5 can't be met without changing the app, and the review asked for the code. `inScope` now allows exactly `lib/site.ts`, `app/p/[id]/page.tsx` and `app/not-found.tsx`. Every other app file, `mobile/`, `package.json` and the build config stay out of scope, and tests pin both lists.
+- `tests/zz-debug-browser.test.ts` still couldn't be renamed: the sandbox refused the `mv`.
+
+**What changed**
+- Code: `lib/site.ts`, `app/p/[id]/page.tsx` and the new `app/not-found.tsx`. Docs: the README's hosting section.
+- Tests: 555 pass and 13 opt-in tests are skipped. `tsc --noEmit` is clean.
+  - `tests/workers-canonical.test.ts` loads the app with the environment `cf:build` gives it: no `NEXT_PUBLIC_SITE_URL`, no Vercel domain, plus the variables the script sets itself (read from `package.json`). It checks that:
+    - each script that builds the Worker (`cf:build`, `preview`, `deploy`) bakes in the Workers address;
+    - a custom domain still wins;
+    - each public page, a poll page and the 404 page name their expected Workers URL;
+    - `app/not-found.tsx` is the only not-found file.
+  - The shared dev server (`tests/browser-app.ts`) now runs with no site address, removing any from the shell, so the browser tests see the app's default.
+    - `tests/zz-debug-browser.test.ts`: a poll page, with and without `?ref=`, has one canonical link, its own address. A missing poll, an unknown address and an unknown tool page are noindex 404s with one canonical link, the Workers home page.
+    - `tests/workers-move-browser.test.ts`: the poll page an old share link lands on names itself on Workers.
+  - `tests/live-site.test.ts` checks the same on the live Worker (opt-in, 13 tests now).
+  - Mutation-checked, then reverted. With the old Vercel fallback, 27 tests fail across the offline and browser files. Without the poll page's and the 404's canonical links, 6 fail: 2 offline and 4 in the browser.
+- `npm run build`, with no site address set, prerenders `/_not-found` with `noindex` and a canonical link to `https://tiebreak.1426davejobs.workers.dev`. It prerenders the static pages with their own address on Workers.
+- **Not verified here:** the live Worker, since the sandbox has no network. The fix reaches the live site with the next Workers deploy of main (`provision cloudflare deploy tiebreak <checkout>`). Then run `LIVE_SITE=1 npx vitest run tests/live-site.test.ts`.

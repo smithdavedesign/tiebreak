@@ -1,21 +1,30 @@
-// npm run screenshots: starts the app, drives the main job with Playwright at
-// desktop and phone size, saves PNGs to docs/screenshots/ and stops the app. Not
-// part of `npm test`. The flow: a seller posts a poll with a photo for each option;
-// its link unfurls as the poll's share card; a stranger opens the link, votes and is
-// offered "Make your own tiebreak", which opens the start page; two more votes close
-// the poll, and its card shows the winner and the split. The cards are images
-// (1200×630), so they're taken once, at desktop size. The sample photos are drawn in
-// the browser (two mugs), so no real photo is used.
+// npm run screenshots: starts the app, drives it with Playwright, saves PNGs to
+// docs/screenshots/ and stops the app. Not part of `npm test`. Two parts:
+// - The main job, at desktop and phone size: on the start page a seller fills in a
+//   poll with a photo for each option (home-*.png) and posts it; three strangers
+//   vote, the poll closes at its target, and its page shows the winner and the
+//   split (result-*.png). The sample photos are drawn in the browser (two mugs), so
+//   no real photo is used.
+// - The move off Vercel (GROWTH.md 2026-11-08), on two plain evidence pages: old
+//   links asked of a local stand-in for Vercel's router that applies vercel.json
+//   (redirect.png), and old links followed in Chromium at 1280 and 390 px onto the
+//   Workers address, which the local app plays, with the visit beacon each page
+//   load sends (beacon.png). Nothing reaches Vercel, Cloudflare or RepoHQ.
 //
 // Needs CHROMIUM_PATH (a Chromium/Chrome binary; no browser is downloaded). The
 // dev server is used because the production build requires DATABASE_URL, while
 // dev runs on an in-process Postgres (PGlite) with sample data only. The app
 // never sees a real database or Stripe setting from this shell: those variables
-// are dropped.
+// are dropped. It's built as the Workers deploy is (its address, production), so
+// the beacon's code runs; automated browsers send nothing, and the evidence
+// browser's signals are answered here.
 import { spawn } from 'node:child_process'
 import { mkdir, readdir, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { chromium, devices } from 'playwright-core'
+import { SIGNAL_URL } from '../lib/site.ts'
+import { VERCEL_URL, WORKERS_URL, vercelAnswer, vercelConfig, visitWorkersFrom } from '../tests/workers-move.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const outDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url))
@@ -27,14 +36,14 @@ const OPTION_A = 'Speckled blue glaze, morning light'
 const OPTION_B = 'Matte white on a walnut shelf'
 const TARGET = 3
 const SIZES = ['desktop', 'mobile']
-const SHOTS = ['card-open.png', 'card-result.png', ...['voted', 'home'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`))]
+const SHOTS = [...['home', 'result'].flatMap((name) => SIZES.map((size) => `${name}-${size}.png`)), 'redirect.png', 'beacon.png']
 
 if (!process.env.CHROMIUM_PATH) {
   console.error('Set CHROMIUM_PATH to a Chromium or Chrome binary (no browser is downloaded).')
   process.exit(1)
 }
 
-// Sample data only: no real database, no real Stripe, no visit beacon (not production).
+// Sample data only: no real database, no real Stripe; built like the Workers deploy (cf:build's env, its address).
 const appEnv = Object.fromEntries(
   Object.entries(process.env).filter(
     ([name]) => name !== 'DATABASE_URL' && !name.startsWith('STRIPE_') && !name.endsWith('VERCEL_ENV'),
@@ -48,6 +57,8 @@ const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '
     ...appEnv,
     NEXT_TELEMETRY_DISABLED: '1',
     HOUSE_POLLS: 'off',
+    NEXT_PUBLIC_DEPLOY_ENV: 'production',
+    NEXT_PUBLIC_SITE_URL: WORKERS_URL,
   },
 })
 const stopApp = () => {
@@ -191,19 +202,9 @@ async function waitForImages(page, selector) {
   for (let i = 0; i < 100 && !(await allLoaded(images)); i++) await page.waitForTimeout(100)
 }
 
-/** A poll's share card, opened as an image (what a chat app or social site shows for the link). */
-async function shotOfCard(page, path, file) {
-  const res = await page.goto(`${base}${path}`)
-  if (res?.status() !== 200 || res.headers()['content-type'] !== 'image/png') {
-    throw new Error(`The card at ${path} answered ${res?.status()} ${res?.headers()['content-type']}`)
-  }
-  await page.screenshot({ path: `${outDir}${file}` })
-}
-
+/** The main job at one size; returns the poll's id. */
 async function run(browser, label, contextOptions) {
-  const desktop = label === 'desktop'
-
-  // 1. A seller posts a poll with a photo for each option (the main job).
+  // 1. The start page: a seller fills in a poll with a photo for each option.
   const seller = await browser.newContext(contextOptions)
   const page = await seller.newPage()
   await page.goto(base)
@@ -216,40 +217,130 @@ async function run(browser, label, contextOptions) {
   await page.getByLabel('Option A photo').setInputFiles({ name: 'speckled-blue-mug.jpg', mimeType: 'image/jpeg', buffer: photos.a })
   await page.getByLabel('Option B photo').setInputFiles({ name: 'white-mug-walnut.jpg', mimeType: 'image/jpeg', buffer: photos.b })
   await page.locator('img.thumb').nth(1).waitFor()
+  await shot(page, `home-${label}.png`)
+
+  // 2. The core action: the poll is posted.
   await page.getByRole('button', { name: 'Create poll' }).click()
   await page.waitForURL(/\/p\/[^/?]+/)
   await page.getByText('Your poll is live').waitFor()
   const id = new URL(page.url()).pathname.split('/').pop()
 
-  // 2. What its link unfurls as: the poll's own card, the question and both photos.
-  if (desktop) await shotOfCard(page, `/p/${id}/card?v=open`, 'card-open.png')
+  // 3. Its result: three strangers vote through the poll's API, as its page does (each
+  // without a cookie, so each is a new anonymous account), the poll closes at its
+  // target of 3, and the seller's page shows the winner and the split.
+  for (const option of [0, 1, 0]) await strangerVotes(id, option)
+  await page.goto(`${base}/p/${id}`)
+  await page.getByText(/^Winner: A/).waitFor()
+  await waitForImages(page, 'main img')
+  await shot(page, `result-${label}.png`)
 
-  // 3. A stranger opens the shared link (no cookie: a new anonymous account), picks
-  // one, and is offered a poll of their own.
-  const stranger = await browser.newContext(contextOptions)
-  const voter = await stranger.newPage()
-  await voter.goto(`${base}/p/${id}`)
-  await waitForImages(voter, '.swipe-card img')
-  await voter.getByRole('button', { name: 'Pick A' }).click()
-  const makeYourOwn = voter.getByRole('link', { name: 'Make your own tiebreak' })
-  await makeYourOwn.waitFor()
-  await shot(voter, `voted-${label}.png`)
-
-  // 4. The link opens the start page, tagged ?ref=poll for the visit counter.
-  await makeYourOwn.click()
-  await voter.waitForURL(`${base}/?ref=poll`)
-  await voter.getByLabel('Question').waitFor()
-  await shot(voter, `home-${label}.png`)
-
-  // 5. Two more strangers vote; the poll closes at 3, and its card shows the winner and the split.
-  if (desktop) {
-    await strangerVotes(id, 0)
-    await strangerVotes(id, 1)
-    await shotOfCard(page, `/p/${id}/card?v=closed`, 'card-result.png')
-  }
-
-  await stranger.close()
   await seller.close()
+  return id
+}
+
+const escapeHtml = (value) =>
+  String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+/** A plain evidence page, drawn at desktop size. */
+async function shotOfEvidence(browser, file, title, intro, body) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+  await page.setContent(`<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
+    body { font: 15px/1.45 system-ui, sans-serif; margin: 28px 36px; color: #1d1d1f }
+    h1 { font-size: 22px; margin: 0 0 6px } p { margin: 0 0 14px; color: #444; max-width: 1180px }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 16px; table-layout: fixed } th { text-align: left; font-weight: 600; background: #f2f2f4 }
+    th, td { border: 1px solid #d8d8dc; padding: 5px 9px; vertical-align: top; overflow-wrap: anywhere } code, pre, td.mono { font: 13px/1.4 ui-monospace, Menlo, monospace }
+    pre { background: #f7f7f9; border: 1px solid #d8d8dc; padding: 10px 12px; margin: 0 } .ok { color: #1a7f37; font-weight: 600 }
+  </style></head><body><h1>${escapeHtml(title)}</h1><p>${intro}</p>${body}</body></html>`)
+  await page.screenshot({ path: `${outDir}${file}` })
+  await page.close()
+}
+
+/**
+ * Old links asked of a local stand-in for Vercel's router: a real HTTP server that answers each request the way
+ * vercel.json makes Vercel answer it (vercelAnswer, tests/workers-move.ts).
+ */
+async function redirectEvidence(browser, id) {
+  const config = vercelConfig()
+  const standIn = createServer((req, res) => {
+    const to = vercelAnswer(config, `${VERCEL_URL}${req.url}`)
+    res.writeHead(to ? to.status : 404, to ? { location: to.location } : {})
+    res.end()
+  }).listen(0, '127.0.0.1')
+  await new Promise((resolve) => standIn.once('listening', resolve))
+  const requests = [
+    ['HEAD', '/', 'criterion 1'],
+    ['HEAD', '/polls/abc123', 'criterion 1'],
+    ['HEAD', '/polls/abc123?src=x', 'criterion 1'],
+    ['GET', `/p/${id}?ref=poll`, 'a shared poll link, tagged'],
+    ['POST', `/polls/${id}/votes`, 'the native app’s vote: a 308 keeps the POST'],
+    ['GET', '//evil.example/x', 'stays on the Workers host'],
+  ]
+  const rows = []
+  try {
+    for (const [method, path, what] of requests) {
+      const res = await fetch(`http://127.0.0.1:${standIn.address().port}${path}`, {
+        method,
+        redirect: 'manual',
+        ...(method === 'POST' ? { headers: { 'content-type': 'application/json' }, body: '{"option":0}' } : {}),
+      })
+      rows.push(`<tr><td class="mono">${method} ${escapeHtml(VERCEL_URL + path)}</td><td class="mono ok">${res.status}</td>
+        <td class="mono">${escapeHtml(res.headers.get('location'))}</td><td>${escapeHtml(what)}</td></tr>`)
+    }
+  } finally {
+    standIn.close()
+  }
+  await shotOfEvidence(
+    browser,
+    'redirect.png',
+    'Old links on tiebreak-phi.vercel.app, answered the way vercel.json makes Vercel answer them',
+    'Real HTTP requests to a local stand-in for Vercel’s router, which applies vercel.json’s one rule as Vercel documents it ' +
+      '(<code>tests/workers-move.ts</code>). Vercel itself can’t be reached from the build sandbox: once the merge is deployed, ' +
+      '<code>LIVE_SITE=1 npx vitest run tests/live-site.test.ts</code> asks the real one.',
+    `<table><tr><th style="width: 33%">Request</th><th style="width: 7%">Status</th><th style="width: 40%">Location</th><th>What it shows</th></tr>${rows.join('')}</table>
+     <pre>${escapeHtml(JSON.stringify(config, null, 2))}</pre>`,
+  )
+}
+
+/**
+ * Old links followed in Chromium at 1280 and 390 px: vercel.json's rule answers each with a 308, and the browser
+ * opens its Location on the Workers address, which the local app plays (visitWorkersFrom, tests/workers-move.ts;
+ * Playwright routes only a redirect's first URL, so the hop is taken here). The page's visit beacon is answered here.
+ */
+async function beaconEvidence(browser, id) {
+  const config = vercelConfig()
+  const runs = [
+    ['1280 px', { viewport: { width: 1280, height: 800 } }, `${VERCEL_URL}/`, undefined],
+    ['390 px (iPhone 13)', { ...devices['iPhone 13'] }, `${VERCEL_URL}/p/${id}?ref=old-link`, 'https://www.reddit.com/'],
+  ]
+  const rows = []
+  for (const [label, contextOptions, oldLink, referer] of runs) {
+    const context = await browser.newContext(contextOptions)
+    const signals = await visitWorkersFrom(context, base, SIGNAL_URL)
+    const page = await context.newPage()
+    const hop = vercelAnswer(config, oldLink)
+    const res = await page.goto(hop.location, { referer })
+    await page.locator('h1, h2').first().waitFor()
+    for (let i = 0; i < 300 && signals.length === 0; i++) await page.waitForTimeout(100)
+    await page.waitForTimeout(2000) // a second beacon for the same load would show by now
+    if (signals.length !== 1) throw new Error(`${label}: ${signals.length} visit beacons for one page load`)
+    const canonical = await page.locator('link[rel="canonical"]').evaluateAll((links) => links.map((l) => l.href))
+    const robots = await page.locator('meta[name="robots"]').evaluateAll((metas) => metas.map((m) => m.content))
+    rows.push(`<tr><td>${escapeHtml(label)}${referer ? `<br>from ${escapeHtml(referer)}` : ''}</td>
+      <td class="mono">${escapeHtml(oldLink)}<br>→ ${hop.status} → ${res.status()} ${escapeHtml(page.url())}</td>
+      <td class="mono"><span class="ok">${signals.length} request</span>, sent from ${escapeHtml(signals[0].pageUrl)}<br>${escapeHtml(JSON.stringify(signals[0].body))}</td>
+      <td class="mono">${canonical.length ? escapeHtml(canonical.join(' ')) : `none (${escapeHtml(robots.join(' '))})`}</td></tr>`)
+    await context.close()
+  }
+  await shotOfEvidence(
+    browser,
+    'beacon.png',
+    'Old links followed in Chromium onto the Workers site, where the visit beacon counts them once',
+    'vercel.json’s rule answers each old link with a 308 (as in redirect.png), and Chromium opens its Location on ' +
+      `<code>${escapeHtml(WORKERS_URL)}</code>, played by the local app built as the Workers deploy is (its address, production). ` +
+      'The beacon’s request to RepoHQ’s signal endpoint is answered here, so nothing left the machine; the real site and ' +
+      'endpoint are checked by <code>LIVE_SITE=1</code> runs of <code>tests/live-site.test.ts</code>.',
+    `<table><tr><th style="width: 15%">Viewport</th><th style="width: 30%">Old link → page opened</th><th style="width: 33%">Visit beacon for that page load</th><th>Canonical link</th></tr>${rows.join('')}</table>`,
+  )
 }
 
 /** This script owns docs/screenshots/: PNGs from older runs that it no longer takes go. */
@@ -266,8 +357,10 @@ try {
   await waitForApp()
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
   try {
-    await run(browser, 'desktop', { viewport: { width: 1280, height: 800 } })
+    const id = await run(browser, 'desktop', { viewport: { width: 1280, height: 800 } })
     await run(browser, 'mobile', { ...devices['iPhone 13'] })
+    await redirectEvidence(browser, id)
+    await beaconEvidence(browser, id)
   } finally {
     await browser.close()
   }

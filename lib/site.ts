@@ -1,19 +1,22 @@
 import type { Metadata } from 'next'
 
-// Where the site lives, for canonical URLs, the sitemap and share cards. NEXT_PUBLIC_SITE_URL wins (set it
-// when there's a custom domain); otherwise Vercel's production domain; otherwise the current one.
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '') ||
-  'https://tiebreak-phi.vercel.app'
-).replace(/\/+$/, '')
+/** The live site: the Workers deploy of main (GROWTH.md 2026-11-08; the old Vercel address only redirects here). */
+export const WORKERS_URL = 'https://tiebreak.1426davejobs.workers.dev'
+
+// Where the site lives, for canonical URLs, the sitemap and share cards: the Workers site, which is what a plain
+// `npm run cf:build` bakes in. NEXT_PUBLIC_SITE_URL wins (set it when there's a custom domain). Vercel's production
+// domain is no longer a fallback: it answers every request with a redirect to Workers.
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || WORKERS_URL).replace(/\/+$/, '')
 
 export const SITE_NAME = 'tiebreak'
 export const HOME_TITLE = 'tiebreak — let strangers break the tie'
 export const SITE_DESCRIPTION =
   "Can't choose? Post 2–4 options, share the link, and let people swipe to pick one. The poll closes at your vote target or deadline."
 
-/** The public pages search engines should list (poll pages are people's own links, so they're left out). */
+/**
+ * The public pages search engines should list (poll pages are people's own links, so they're left out: noindex,
+ * though each still names its own address as canonical, and every 404 names the home page; app/not-found.tsx).
+ */
 export const PUBLIC_PAGES = [
   '/',
   '/feed',
